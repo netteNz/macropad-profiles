@@ -1,0 +1,3 @@
+# Host-side test deps (pure-Python on CPython)
+adafruit-circuitpython-hid
+adafruit-circuitpython-ticks
