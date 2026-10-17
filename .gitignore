@@ -1,0 +1,7 @@
+Macropad_Hotkeys/
+__pycache__/
+*.pyc
+host/config.local.*
+*.token
+.cache*
+.env
