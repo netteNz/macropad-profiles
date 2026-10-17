@@ -129,6 +129,7 @@ while True:
                 % (loops / secs, worst, ui.refreshes / secs, ui.refresh_ms_max,
                    gc.mem_free(), " | KEY EVENTS OVERFLOWED" if hw.keys.events.overflowed else "")
             )
+            # overflowed is read-only and sticky (only events.clear() resets it,
+            # which would drop queued presses), so it's reported, not reset.
             loops = worst = ui.refreshes = ui.refresh_ms_max = 0
-            hw.keys.events.overflowed = False
             stats_at = now
