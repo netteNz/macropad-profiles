@@ -41,6 +41,17 @@ class ValidateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             pl.validate(_app(press={"host": "x", "fallback": [print]}), "t.py")
 
+    def test_rejects_non_finite_delays(self):
+        for bad_delay in (float("nan"), float("inf"), float("-inf")):
+            for action in ([K.A, bad_delay], [[0xCD, bad_delay]]):
+                app = _app()
+                app["macros"][0] = (0, "x", action)
+                with self.assertRaises(ValueError):
+                    pl.validate(app, "t.py")
+        app = _app()
+        app["macros"][0] = (0, "x", [K.A, 0.2, [0xCD, 0.1]])
+        pl.validate(app, "t.py")  # finite delays still fine
+
     def test_label_truncated_and_ascii(self):
         app = _app()
         app["macros"][0] = (0, "Arcángel", [K.A])

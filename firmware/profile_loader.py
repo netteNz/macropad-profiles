@@ -18,13 +18,19 @@ def _ascii(s):
     return "".join(c if 32 <= ord(c) < 127 else "?" for c in s)
 
 
+def _ok_number(x):
+    # nan/inf delays would crash int(x * 1000) at runtime. x - x is 0 only
+    # for finite numbers (and works without math.isfinite).
+    return isinstance(x, (int, float)) and (isinstance(x, int) or x - x == 0)
+
+
 def _check_seq(seq, where):
     if not isinstance(seq, list):
         seq = [seq]
     for item in seq:
-        if isinstance(item, (int, float, str)):
+        if isinstance(item, str) or _ok_number(item):
             continue
-        if isinstance(item, list) and all(isinstance(c, (int, float)) for c in item):
+        if isinstance(item, list) and all(_ok_number(c) for c in item):
             continue
         raise ValueError("%s: unsupported item %r" % (where, item))
     return seq

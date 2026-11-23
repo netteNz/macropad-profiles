@@ -132,13 +132,14 @@ class Runner:
                 return
             s.resume = None
         if s.chars is not None:
-            self._type_one(s)
+            self._type_one(slot, s)
             return
         while s.i < len(s.steps):
             kind, arg = s.steps[s.i]
             s.i += 1
             if kind == _PRESS:
-                self._kbd.press(arg)
+                if not self._press(slot, s, (arg,)):
+                    return
                 if arg not in s.held:
                     s.held.append(arg)
             elif kind == _RELEASE:
@@ -155,12 +156,28 @@ class Runner:
                 return
             elif kind == _TYPE:
                 s.chars = arg
-                self._type_one(s)
+                self._type_one(slot, s)
                 return
         if s.released:
             self._finish(slot, s)
 
-    def _type_one(self, s):
+    def _press(self, slot, s, codes):
+        """Keyboard.press(), but a full report (more than six regular keys held
+        across all slots) cancels this action instead of crashing the loop."""
+        try:
+            self._kbd.press(*codes)
+            return True
+        except ValueError as e:
+            print("actions: slot %d cancelled: %s" % (slot, e))
+        # press() adds codes to the report before raising, so take back the
+        # ones nobody else holds along with everything this slot held.
+        s.held.extend(c for c in codes if c not in s.held)
+        self._let_go(s)
+        if self._slots.get(slot) is s:
+            del self._slots[slot]
+        return False
+
+    def _type_one(self, slot, s):
         # layout.write() would block for the whole string and release_all(),
         # dropping modifiers the sequence is holding. One char per tick instead.
         ch, s.chars = s.chars[0], s.chars[1:] or None
@@ -169,7 +186,8 @@ class Runner:
         except ValueError:
             print("actions: can't type %r" % ch)
             return
-        self._kbd.press(*codes)
+        if not self._press(slot, s, codes):
+            return
         up = [c for c in codes if c not in s.held and not self._held_elsewhere(c, s)]
         if up:
             self._kbd.release(*up)
