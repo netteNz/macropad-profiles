@@ -74,7 +74,7 @@
     <text class="p" x="412" y="100">Turn: profile's knob action (volume, tabs…)</text>
     <text class="p" x="412" y="118">Press: Play/Pause by default</text>
     <text class="p" x="412" y="136">Hold + turn: profile picker, release to switch</text>
-    <text class="p" x="412" y="154">Long press: toggle the base view</text>
+    <text class="p" x="412" y="154">Long press: reserved for future views</text>
   </g>
 
   <path class="lead" d="M264 150 L404 196"/>

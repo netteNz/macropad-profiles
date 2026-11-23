@@ -23,7 +23,7 @@ software is needed.
   | Turn | Profile's knob action (system volume by default) |
   | Press | Profile's press action (Play/Pause by default) |
   | Hold + turn | Open the profile picker; release to switch |
-  | Long press (≥ 600 ms) | Toggle the base view |
+  | Long press (≥ 600 ms) | Reserved for switching views (only the keymap view exists so far) |
 
 - **Macros:** key sequences, chords held for as long as you hold the key (for
   example, push-to-talk), delays, typed text and media keys. They run without
@@ -46,7 +46,7 @@ python -m venv .venv
 .venv\Scripts\pip install circup -r firmware/tests/requirements.txt
 
 # Install board libraries onto the CIRCUITPY drive
-circup install -r firmware/requirements.txt
+.venv\Scripts\circup install -r firmware/requirements.txt
 
 # Copy the firmware to the board (default drive F:\)
 .venv\Scripts\python tools\deploy.py --drive F:\
