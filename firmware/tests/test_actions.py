@@ -12,7 +12,13 @@ class FakeKbd:
         self.down = set()
 
     def press(self, *codes):
-        self.down.update(codes)
+        # Like adafruit_hid: codes are added one by one, and the 7th regular
+        # (non-modifier) key raises before the report is sent.
+        for c in codes:
+            self.down.add(c)
+            if len([d for d in self.down if not K.LEFT_CONTROL <= d <= K.RIGHT_GUI]) > 6:
+                self.down.discard(c)
+                raise ValueError("Trying to press more than six keys at once.")
         self.log.append(("press",) + codes)
 
     def release(self, *codes):
@@ -91,6 +97,45 @@ class RunnerTest(unittest.TestCase):
         typed = [e for e in self.log if e[0] == "press"]
         self.assertEqual(typed, [("press", K.GUI), ("press", K.A), ("press", K.B)])
         self.assertEqual(self.kbd.down, set())
+
+    def test_release_during_trailing_delay_defers(self):
+        self.r.start(0, [K.A, 0.4])
+        self.r.tick(0)
+        self.r.release(0)  # key up before the trailing delay ends
+        self.assertIn(K.A, self.kbd.down)
+        self.r.tick(399)
+        self.assertIn(K.A, self.kbd.down)
+        self.r.tick(400)
+        self.assertEqual(self.kbd.down, set())
+        self.assertFalse(self.r.busy())
+
+    def test_two_queued_taps_both_run(self):
+        # Two press/release pairs of one key drained in the same loop pass.
+        for _ in range(2):
+            self.r.start(0, [K.A], now=0)
+            self.r.release(0)
+        self.assertEqual(self.log.count(("press", K.A)), 2)
+        self.assertEqual(self.kbd.down, set())
+
+    def test_seventh_key_cancels_action_instead_of_crashing(self):
+        for k, code in enumerate([K.A, K.B, K.C, K.D, K.E, K.F]):
+            self.r.start(k, [code], now=0)
+        self.r.start(6, [K.CONTROL, K.G], now=1)  # report full: no crash
+        self.assertNotIn(K.G, self.kbd.down)
+        self.assertNotIn(K.CONTROL, self.kbd.down)  # partial press taken back
+        self.r.release(6)  # slot already gone; must be harmless
+        self.assertEqual(len(self.kbd.down), 6)
+        self.r.release(0)
+        self.r.start(7, [K.H], now=2)  # room again
+        self.assertIn(K.H, self.kbd.down)
+
+    def test_typing_overflow_cancels_action(self):
+        for k, code in enumerate([K.A, K.B, K.C, K.D, K.E, K.F]):
+            self.r.start(k, [code], now=0)
+        self.r.start(6, "xy", now=1)
+        self.r.tick(2)
+        self.assertNotIn(K.X, self.kbd.down)
+        self.assertNotIn(6, self.r._slots)
 
     def test_typing_one_char_per_tick_keeps_modifiers(self):
         self.r.start(0, [K.SHIFT, "a"])

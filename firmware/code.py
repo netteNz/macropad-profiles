@@ -31,9 +31,8 @@ encoder = Encoder()
 profiles = profile_loader.load_all()
 if not profiles:
     keymap.set_title("NO PROFILES FOUND")
-    ui.tick(ticks_ms())
-    while True:
-        pass
+    while True:  # keep ticking: the first tick can fall inside the frame throttle
+        ui.tick(ticks_ms())
 gc.collect()
 
 current = None
@@ -58,7 +57,7 @@ def on_turn(delta, now):
     elif knob[0] == "keys":
         seq = knob[1] if delta > 0 else knob[2]
         for _ in range(abs(delta)):
-            runner.queue(KNOB, seq)
+            runner.queue(KNOB, seq, now)
     # ("host", cmd): reserved, no-op without the host.
 
 
@@ -67,7 +66,7 @@ def on_gesture(g, now):
     if name == "turn":
         on_turn(g[1], now)
     elif name == "press":
-        runner.start(PRESS, current["press"], tap=True)
+        runner.start(PRESS, current["press"], tap=True, now=now)
     elif name == "long_press":
         if not ui.toggle_base() and DEBUG:
             print("long-press: only one base view")
@@ -81,6 +80,15 @@ def on_gesture(g, now):
         if profiles[picker.selected] is not current:
             set_profile(picker.selected)
             profile_loader.save_last(current["name"])
+
+
+def poll_encoder(now):
+    global last_pos
+    pos = hw.encoder_position()
+    if pos != last_pos:
+        for g in encoder.rotate(pos - last_pos):
+            on_gesture(g, now)
+        last_pos = pos
 
 
 set_profile(profile_loader.load_last(profiles))
@@ -97,21 +105,21 @@ while True:
     while hw.keys.events.get_into(event):
         k = event.key_number
         if k == hw.ENC_KEY:
+            if event.released:
+                # Detents that piled up while the switch was held belong to the
+                # hold (picker), not to a turn after release.
+                poll_encoder(now)
             g = encoder.button(event.pressed, event.timestamp)
             if g:
                 on_gesture(g, now)
         elif event.pressed:
             leds.set_held(k, True)
-            runner.start(k, current["macros"][k][2])
+            runner.start(k, current["macros"][k][2], now=now)
         else:
             leds.set_held(k, False)
             runner.release(k)
 
-    pos = hw.encoder_position()
-    if pos != last_pos:
-        for g in encoder.rotate(pos - last_pos):
-            on_gesture(g, now)
-        last_pos = pos
+    poll_encoder(now)
 
     runner.tick(now)
     leds.tick(now)

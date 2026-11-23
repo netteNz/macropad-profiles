@@ -1,4 +1,5 @@
-# Browser: shortcuts shared by Chrome, Edge and Firefox.
+# Browser: shortcuts shared by Chrome, Edge and Firefox, except Incog
+# (Ctrl+Shift+N) which is Chrome/Edge only; Firefox uses Ctrl+Shift+P.
 # Knob switches tabs; knob press stays Play/Pause (default).
 from adafruit_hid.keycode import Keycode as K
 

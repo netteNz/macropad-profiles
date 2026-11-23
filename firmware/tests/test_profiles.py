@@ -41,6 +41,17 @@ class ValidateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             pl.validate(_app(press={"host": "x", "fallback": [print]}), "t.py")
 
+    def test_rejects_non_finite_delays(self):
+        for bad_delay in (float("nan"), float("inf"), float("-inf")):
+            for action in ([K.A, bad_delay], [[0xCD, bad_delay]]):
+                app = _app()
+                app["macros"][0] = (0, "x", action)
+                with self.assertRaises(ValueError):
+                    pl.validate(app, "t.py")
+        app = _app()
+        app["macros"][0] = (0, "x", [K.A, 0.2, [0xCD, 0.1]])
+        pl.validate(app, "t.py")  # finite delays still fine
+
     def test_label_truncated_and_ascii(self):
         app = _app()
         app["macros"][0] = (0, "Arcángel", [K.A])
@@ -97,6 +108,13 @@ class NvmTest(unittest.TestCase):
         nvm = bytearray(b"\xff" * 64)
         pl.save_last("Spotify", nvm)
         self.assertEqual(pl.load_last(self.ps, nvm), 1)
+
+    def test_long_name_survives_truncation(self):
+        long_name = "Very Long Profile Name For Testing NVM"  # > 30 bytes
+        ps = self.ps + [{"name": long_name}]
+        nvm = bytearray(b"\xff" * 64)
+        pl.save_last(long_name, nvm)
+        self.assertEqual(pl.load_last(ps, nvm), 2)
 
     def test_blank_or_unknown_falls_back(self):
         self.assertEqual(pl.load_last(self.ps, bytearray(b"\xff" * 64)), 0)

@@ -75,18 +75,26 @@ class Runner:
     def busy(self):
         return bool(self._slots)
 
-    def start(self, slot, action, tap=False):
-        """Run `action` in `slot`, cutting short whatever was running there."""
+    def start(self, slot, action, tap=False, now=None):
+        """Run `action` in `slot`, cutting short whatever was running there.
+
+        With `now`, the first steps run immediately, so a second press of the
+        same key drained from the same event batch can't replace an action
+        that hasn't sent anything yet.
+        """
         old = self._slots.pop(slot, None)
         if old:
             self._let_go(old)
-        self._slots[slot] = _Slot(_compile(action, self._host_alive), tap)
+        s = _Slot(_compile(action, self._host_alive), tap)
+        self._slots[slot] = s
+        if now is not None:
+            self._advance(slot, s, now)
 
-    def queue(self, slot, action):
+    def queue(self, slot, action, now=None):
         """Append a tap action behind whatever `slot` is running (knob detents)."""
         s = self._slots.get(slot)
         if s is None:
-            self.start(slot, action, tap=True)
+            self.start(slot, action, tap=True, now=now)
         elif len(s.queue) < _QUEUE_MAX:
             s.queue.append(action)
 
@@ -96,7 +104,8 @@ class Runner:
         if s is None:
             return
         s.released = True
-        if s.i >= len(s.steps) and s.chars is None:
+        # A trailing delay still counts as running: finish when it expires.
+        if s.i >= len(s.steps) and s.chars is None and s.resume is None:
             self._finish(slot, s)
 
     def release_all(self):
@@ -123,13 +132,14 @@ class Runner:
                 return
             s.resume = None
         if s.chars is not None:
-            self._type_one(s)
+            self._type_one(slot, s)
             return
         while s.i < len(s.steps):
             kind, arg = s.steps[s.i]
             s.i += 1
             if kind == _PRESS:
-                self._kbd.press(arg)
+                if not self._press(slot, s, (arg,)):
+                    return
                 if arg not in s.held:
                     s.held.append(arg)
             elif kind == _RELEASE:
@@ -146,12 +156,28 @@ class Runner:
                 return
             elif kind == _TYPE:
                 s.chars = arg
-                self._type_one(s)
+                self._type_one(slot, s)
                 return
         if s.released:
             self._finish(slot, s)
 
-    def _type_one(self, s):
+    def _press(self, slot, s, codes):
+        """Keyboard.press(), but a full report (more than six regular keys held
+        across all slots) cancels this action instead of crashing the loop."""
+        try:
+            self._kbd.press(*codes)
+            return True
+        except ValueError as e:
+            print("actions: slot %d cancelled: %s" % (slot, e))
+        # press() adds codes to the report before raising, so take back the
+        # ones nobody else holds along with everything this slot held.
+        s.held.extend(c for c in codes if c not in s.held)
+        self._let_go(s)
+        if self._slots.get(slot) is s:
+            del self._slots[slot]
+        return False
+
+    def _type_one(self, slot, s):
         # layout.write() would block for the whole string and release_all(),
         # dropping modifiers the sequence is holding. One char per tick instead.
         ch, s.chars = s.chars[0], s.chars[1:] or None
@@ -160,7 +186,8 @@ class Runner:
         except ValueError:
             print("actions: can't type %r" % ch)
             return
-        self._kbd.press(*codes)
+        if not self._press(slot, s, codes):
+            return
         up = [c for c in codes if c not in s.held and not self._held_elsewhere(c, s)]
         if up:
             self._kbd.release(*up)
