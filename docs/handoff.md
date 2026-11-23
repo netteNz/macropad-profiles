@@ -10,7 +10,9 @@
   - Profile files are data only.
 
 ## Environment
-- Repo: `D:\code\boards\macropad`, branch `profiles-bridge`. `main` keeps Hotkeys II intact for now.
+- Repo: `D:\code\boards\macropad`, remote `origin` = `github.com/netteNz/macropad-profiles`.
+  - `main` holds the current firmware. Work on a short-lived branch off `main`, open a PR, and delete the branch after merging.
+  - Copilot reviews each PR once when it opens (repo ruleset); `.github/copilot-instructions.md` tells it what to focus on. Reply to each finding and resolve the thread, or decline it with the reason.
 - Layout:
   - `firmware/` — boot.py, code.py, `ui/`, `profiles/`, lib requirements
   - `host/` — Windows daemon
