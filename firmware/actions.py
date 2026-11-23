@@ -39,7 +39,8 @@ def _compile(action, host_alive):
         elif isinstance(item, float):
             steps.append((_DELAY, int(item * 1000)))
         elif isinstance(item, str):
-            steps.append((_TYPE, item))
+            if item:  # "" types nothing; a _TYPE step with no chars would crash
+                steps.append((_TYPE, item))
         elif isinstance(item, list):
             for code in item:
                 if isinstance(code, float):
@@ -56,7 +57,6 @@ class _Slot:
         self.resume = None  # ticks_ms when a delay ends
         self.chars = None  # remaining text of a _TYPE step
         self.held = []  # keycodes this slot pressed and still holds
-        self.consumer = False
         self.released = tap  # physical key already up (or never held)
         self.queue = []
 
@@ -68,6 +68,9 @@ class Runner:
         self._layout = layout
         self._host_alive = host_alive
         self._slots = {}
+        # The consumer report holds one code at a time, so the newest press owns
+        # it; an older slot finishing must not release someone else's code.
+        self._cc_owner = None
 
     def busy(self):
         return bool(self._slots)
@@ -102,6 +105,13 @@ class Runner:
         self._slots.clear()
         self._kbd.release_all()
         self._cc.release()
+        self._cc_owner = None
+
+    def consumer_send(self, code):
+        """One-shot consumer tap outside any slot (knob volume). It empties the
+        report, so whichever slot held a consumer code no longer owns it."""
+        self._cc.send(code)
+        self._cc_owner = None
 
     def tick(self, now):
         for slot in list(self._slots):
@@ -123,13 +133,14 @@ class Runner:
                 if arg not in s.held:
                     s.held.append(arg)
             elif kind == _RELEASE:
-                self._kbd.release(arg)
                 if arg in s.held:
                     s.held.remove(arg)
+                if not self._held_elsewhere(arg, s):
+                    self._kbd.release(arg)
             elif kind == _CONSUMER:
-                self._cc.release()
+                self._cc.release()  # so a repeated code registers as a new press
                 self._cc.press(arg)
-                s.consumer = True
+                self._cc_owner = s
             elif kind == _DELAY:
                 s.resume = ticks_add(now, arg)
                 return
@@ -150,7 +161,7 @@ class Runner:
             print("actions: can't type %r" % ch)
             return
         self._kbd.press(*codes)
-        up = [c for c in codes if c not in s.held]
+        up = [c for c in codes if c not in s.held and not self._held_elsewhere(c, s)]
         if up:
             self._kbd.release(*up)
 
@@ -163,10 +174,20 @@ class Runner:
         else:
             del self._slots[slot]
 
+    def _held_elsewhere(self, code, s):
+        # The keyboard report doesn't know who pressed what: a key two slots
+        # hold (e.g. Control) stays down until the last of them lets go.
+        for o in self._slots.values():
+            if o is not s and code in o.held:
+                return True
+        return False
+
     def _let_go(self, s):
         if s.held:
-            self._kbd.release(*s.held)
+            up = [c for c in s.held if not self._held_elsewhere(c, s)]
+            if up:
+                self._kbd.release(*up)
             s.held = []
-        if s.consumer:
+        if self._cc_owner is s:
             self._cc.release()
-            s.consumer = False
+            self._cc_owner = None

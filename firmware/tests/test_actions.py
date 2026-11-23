@@ -38,6 +38,10 @@ class FakeCC:
             self.log.append(("cc_up",))
         self.down = None
 
+    def send(self, code):
+        self.press(code)
+        self.release()
+
 
 class FakeLayout:
     def keycodes(self, ch):
@@ -132,6 +136,56 @@ class RunnerTest(unittest.TestCase):
         self.r.start(0, [K.GUI, -K.GUI])
         self.r.tick(0)
         self.assertEqual(self.kbd.down, set())
+
+    def test_empty_string_is_a_no_op(self):
+        self.r.start(0, [K.A, "", K.B])
+        self.r.tick(0)  # used to raise IndexError
+        self.assertEqual(self.kbd.down, {K.A, K.B})
+        self.r.release(0)
+        self.assertFalse(self.r.busy())
+
+    def test_knob_tap_keeps_control_held_by_key(self):
+        self.r.start(6, [K.CONTROL, K.L])  # Browser "Addr", key still down
+        self.r.tick(0)
+        self.r.queue(KNOB, [K.CONTROL, K.TAB])  # Browser knob detent
+        self.r.tick(1)
+        self.assertIn(K.CONTROL, self.kbd.down)
+        self.assertNotIn(K.TAB, self.kbd.down)
+        self.r.release(6)
+        self.assertEqual(self.kbd.down, set())
+
+    def test_explicit_release_keeps_key_held_elsewhere(self):
+        self.r.start(0, [K.SHIFT])
+        self.r.tick(0)
+        self.r.start(1, [K.SHIFT, K.A, -K.SHIFT])
+        self.r.tick(1)
+        self.assertIn(K.SHIFT, self.kbd.down)
+
+    def test_typing_keeps_modifier_held_by_other_slot(self):
+        self.r.start(0, [K.SHIFT])
+        self.r.tick(0)
+        self.r.start(1, "A")  # types SHIFT+A
+        self.r.tick(1)
+        self.assertIn(K.SHIFT, self.kbd.down)
+
+    def test_older_consumer_slot_does_not_release_newer(self):
+        self.r.start(0, [[CC.PLAY_PAUSE]])
+        self.r.tick(0)
+        self.r.start(1, [[CC.VOLUME_INCREMENT]])
+        self.r.tick(1)
+        self.r.release(0)
+        self.assertEqual(self.cc.down, CC.VOLUME_INCREMENT)
+        self.r.release(1)
+        self.assertIsNone(self.cc.down)
+
+    def test_consumer_send_drops_ownership(self):
+        self.r.start(0, [[CC.PLAY_PAUSE]])
+        self.r.tick(0)
+        self.r.consumer_send(CC.VOLUME_INCREMENT)
+        self.r.start(1, [[CC.MUTE]])
+        self.r.tick(1)
+        self.r.release(0)  # its code is long gone; must not release MUTE
+        self.assertEqual(self.cc.down, CC.MUTE)
 
 
 if __name__ == "__main__":

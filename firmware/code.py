@@ -52,7 +52,7 @@ def on_turn(delta, now):
     if knob in ("system_volume", "spotify_volume"):  # spotify_volume needs the host (Phase 2)
         code = CC.VOLUME_INCREMENT if delta > 0 else CC.VOLUME_DECREMENT
         for _ in range(abs(delta)):
-            hw.consumer.send(code)
+            runner.consumer_send(code)
         volume.bump(delta, now)
         ui.show_overlay(volume, now)
     elif knob[0] == "keys":
