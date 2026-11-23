@@ -137,9 +137,10 @@ def load_last(profiles, nvm=None):
     try:
         nvm = nvm if nvm is not None else _nvm()
         if nvm[0] == _NVM_MAGIC:
-            name = bytes(nvm[2 : 2 + nvm[1]]).decode()
+            saved = bytes(nvm[2 : 2 + nvm[1]])
             for i, p in enumerate(profiles):
-                if p["name"] == name:
+                # save_last() truncates, so compare the truncated form.
+                if p["name"].encode()[: _NVM_LEN - 2] == saved:
                     return i
     except Exception as e:
         print("profiles: nvm read failed:", e)

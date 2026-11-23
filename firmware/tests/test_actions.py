@@ -92,6 +92,25 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(typed, [("press", K.GUI), ("press", K.A), ("press", K.B)])
         self.assertEqual(self.kbd.down, set())
 
+    def test_release_during_trailing_delay_defers(self):
+        self.r.start(0, [K.A, 0.4])
+        self.r.tick(0)
+        self.r.release(0)  # key up before the trailing delay ends
+        self.assertIn(K.A, self.kbd.down)
+        self.r.tick(399)
+        self.assertIn(K.A, self.kbd.down)
+        self.r.tick(400)
+        self.assertEqual(self.kbd.down, set())
+        self.assertFalse(self.r.busy())
+
+    def test_two_queued_taps_both_run(self):
+        # Two press/release pairs of one key drained in the same loop pass.
+        for _ in range(2):
+            self.r.start(0, [K.A], now=0)
+            self.r.release(0)
+        self.assertEqual(self.log.count(("press", K.A)), 2)
+        self.assertEqual(self.kbd.down, set())
+
     def test_typing_one_char_per_tick_keeps_modifiers(self):
         self.r.start(0, [K.SHIFT, "a"])
         self.r.tick(0)

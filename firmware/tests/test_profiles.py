@@ -98,6 +98,13 @@ class NvmTest(unittest.TestCase):
         pl.save_last("Spotify", nvm)
         self.assertEqual(pl.load_last(self.ps, nvm), 1)
 
+    def test_long_name_survives_truncation(self):
+        long_name = "Very Long Profile Name For Testing NVM"  # > 30 bytes
+        ps = self.ps + [{"name": long_name}]
+        nvm = bytearray(b"\xff" * 64)
+        pl.save_last(long_name, nvm)
+        self.assertEqual(pl.load_last(ps, nvm), 2)
+
     def test_blank_or_unknown_falls_back(self):
         self.assertEqual(pl.load_last(self.ps, bytearray(b"\xff" * 64)), 0)
         nvm = bytearray(b"\xff" * 64)

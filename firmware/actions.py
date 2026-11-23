@@ -75,18 +75,26 @@ class Runner:
     def busy(self):
         return bool(self._slots)
 
-    def start(self, slot, action, tap=False):
-        """Run `action` in `slot`, cutting short whatever was running there."""
+    def start(self, slot, action, tap=False, now=None):
+        """Run `action` in `slot`, cutting short whatever was running there.
+
+        With `now`, the first steps run immediately, so a second press of the
+        same key drained from the same event batch can't replace an action
+        that hasn't sent anything yet.
+        """
         old = self._slots.pop(slot, None)
         if old:
             self._let_go(old)
-        self._slots[slot] = _Slot(_compile(action, self._host_alive), tap)
+        s = _Slot(_compile(action, self._host_alive), tap)
+        self._slots[slot] = s
+        if now is not None:
+            self._advance(slot, s, now)
 
-    def queue(self, slot, action):
+    def queue(self, slot, action, now=None):
         """Append a tap action behind whatever `slot` is running (knob detents)."""
         s = self._slots.get(slot)
         if s is None:
-            self.start(slot, action, tap=True)
+            self.start(slot, action, tap=True, now=now)
         elif len(s.queue) < _QUEUE_MAX:
             s.queue.append(action)
 
@@ -96,7 +104,8 @@ class Runner:
         if s is None:
             return
         s.released = True
-        if s.i >= len(s.steps) and s.chars is None:
+        # A trailing delay still counts as running: finish when it expires.
+        if s.i >= len(s.steps) and s.chars is None and s.resume is None:
             self._finish(slot, s)
 
     def release_all(self):
