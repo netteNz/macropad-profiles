@@ -3,7 +3,7 @@
 ## Working agreement
 - Peer-level, no hand-holding. **Propose the plan for each phase and validate it with Ema before writing code.** Explain non-obvious choices inline as you build.
 - **Stop at the end of every phase** so Ema can test on the board. Don't start the next phase until he confirms.
-- **Subagents:** if you spawn any, run them on **Sonnet 5.5** (`model: sonnet`, i.e. `claude-sonnet-5-5`). Don't spawn them for work you can do inline.
+- **Subagents:** don't spawn them for work you can do inline. When the session model is Fable, run subagents on **Opus 5.5** (`model: opus`).
 - Security posture:
   - No secrets in the repo; tokens live outside the working tree.
   - The host accepts only an allowlisted command set from the pad.

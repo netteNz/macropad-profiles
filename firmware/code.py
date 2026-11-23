@@ -1,73 +1,135 @@
-# MacroPad Spotify controller: rainbow LEDs, media keys, knob = volume.
-import time
-from rainbowio import colorwheel
-from adafruit_macropad import MacroPad
+# MacroPad profiles: per-app key layouts, encoder gestures, OLED UI.
+# Loop: drain input -> gestures -> actions -> LEDs -> UI. No sleeps anywhere;
+# every subsystem paces itself off ticks_ms.
+import gc
 
-macropad = MacroPad()
-macropad.pixels.brightness = 0.3
-macropad.pixels.auto_write = False
-CC = macropad.ConsumerControlCode
-K = macropad.Keycode
+import keypad
+from adafruit_hid.consumer_control_code import ConsumerControlCode as CC
+from adafruit_ticks import ticks_diff, ticks_ms
+
+import hw
+import profile_loader
+from actions import KNOB, PRESS, Runner
+from gestures import Encoder
+from leds import Leds
+from ui.keymap import KeymapView
+from ui.manager import UI
+from ui.picker import Picker
+from ui.volume import VolumeOverlay
+
+DEBUG = True  # loop/refresh stats on the serial console every 5 s; off once Phase 1 is signed off
+
+ui = UI(hw.display)
+keymap = KeymapView()
+ui.add_base("keymap", keymap)
+picker = Picker()
+volume = VolumeOverlay()
+leds = Leds(hw.pixels)
+runner = Runner(hw.keyboard, hw.consumer, hw.layout)
+encoder = Encoder()
+
+profiles = profile_loader.load_all()
+if not profiles:
+    keymap.set_title("NO PROFILES FOUND")
+    ui.tick(ticks_ms())
+    while True:
+        pass
+gc.collect()
+
+current = None
 
 
-def open_spotify():
-    macropad.keyboard.send(K.GUI)
-    time.sleep(0.4)
-    macropad.keyboard_layout.write("spotify\n")
+def set_profile(i):
+    global current
+    current = profiles[i]
+    runner.release_all()
+    keymap.set_profile(current)
+    leds.set_profile(current)
 
 
-# (label, action), top-left to bottom-right.
-# Rows 1-2 are system media keys and work anywhere.
-# Rows 3-4 are Spotify shortcuts and need the Spotify window focused.
-KEYS = [
-    ("Prev", CC.SCAN_PREVIOUS_TRACK), ("Play", CC.PLAY_PAUSE), ("Next", CC.SCAN_NEXT_TRACK),
-    ("Vol-", CC.VOLUME_DECREMENT), ("Mute", CC.MUTE), ("Vol+", CC.VOLUME_INCREMENT),
-    ("Shufl", (K.CONTROL, K.S)), ("Repeat", (K.CONTROL, K.R)), ("Like", (K.ALT, K.SHIFT, K.B)),
-    ("Seek-", (K.SHIFT, K.LEFT_ARROW)), ("Open", open_spotify), ("Seek+", (K.SHIFT, K.RIGHT_ARROW)),
-]
+def on_turn(delta, now):
+    knob = current["knob"]
+    if knob in ("system_volume", "spotify_volume"):  # spotify_volume needs the host (Phase 2)
+        code = CC.VOLUME_INCREMENT if delta > 0 else CC.VOLUME_DECREMENT
+        for _ in range(abs(delta)):
+            runner.consumer_send(code)
+        volume.bump(delta, now)
+        ui.show_overlay(volume, now)
+    elif knob[0] == "keys":
+        seq = knob[1] if delta > 0 else knob[2]
+        for _ in range(abs(delta)):
+            runner.queue(KNOB, seq)
+    # ("host", cmd): reserved, no-op without the host.
 
-# OLED: one line per key row
-text = macropad.display_text(title="Spotify  knob=vol")
-for row in range(4):
-    text[row].text = "".join("{:<7}".format(label) for label, _ in KEYS[row * 3:row * 3 + 3])
-text.show()
 
-hue = 0
-held = set()
-last_pos = macropad.encoder
+def on_gesture(g, now):
+    name = g[0]
+    if name == "turn":
+        on_turn(g[1], now)
+    elif name == "press":
+        runner.start(PRESS, current["press"], tap=True)
+    elif name == "long_press":
+        if not ui.toggle_base() and DEBUG:
+            print("long-press: only one base view")
+    elif name == "picker_open":
+        picker.open([p["name"] for p in profiles], profiles.index(current))
+        ui.show_overlay(picker, now, timeout_ms=None)
+    elif name == "picker_move":
+        picker.move(g[1])
+    elif name == "picker_commit":
+        ui.hide_overlay(picker)
+        if profiles[picker.selected] is not current:
+            set_profile(picker.selected)
+            profile_loader.save_last(current["name"])
+
+
+set_profile(profile_loader.load_last(profiles))
+event = keypad.Event()
+last_pos = hw.encoder_position()
+
+loops = 0
+worst = 0
+stats_at = ticks_ms()
 
 while True:
-    # Rainbow across the keys; held keys flash white
-    for i in range(12):
-        macropad.pixels[i] = 0xFFFFFF if i in held else colorwheel((hue + i * 21) & 255)
-    macropad.pixels.show()
-    hue = (hue + 1) & 255
+    now = ticks_ms()
 
-    event = macropad.keys.events.get()
-    if event:
-        if event.pressed:
-            held.add(event.key_number)
-            action = KEYS[event.key_number][1]
-            if callable(action):
-                action()
-            elif isinstance(action, tuple):
-                macropad.keyboard.send(*action)
-            else:
-                macropad.consumer_control.send(action)
+    while hw.keys.events.get_into(event):
+        k = event.key_number
+        if k == hw.ENC_KEY:
+            g = encoder.button(event.pressed, event.timestamp)
+            if g:
+                on_gesture(g, now)
+        elif event.pressed:
+            leds.set_held(k, True)
+            runner.start(k, current["macros"][k][2])
         else:
-            held.discard(event.key_number)
+            leds.set_held(k, False)
+            runner.release(k)
 
-    # Knob turns volume, knob press toggles play/pause
-    pos = macropad.encoder
-    while pos > last_pos:
-        macropad.consumer_control.send(CC.VOLUME_INCREMENT)
-        last_pos += 1
-    while pos < last_pos:
-        macropad.consumer_control.send(CC.VOLUME_DECREMENT)
-        last_pos -= 1
+    pos = hw.encoder_position()
+    if pos != last_pos:
+        for g in encoder.rotate(pos - last_pos):
+            on_gesture(g, now)
+        last_pos = pos
 
-    macropad.encoder_switch_debounced.update()
-    if macropad.encoder_switch_debounced.pressed:
-        macropad.consumer_control.send(CC.PLAY_PAUSE)
+    runner.tick(now)
+    leds.tick(now)
+    ui.tick(now)
 
-    time.sleep(0.01)
+    if DEBUG:
+        loops += 1
+        took = ticks_diff(ticks_ms(), now)
+        if took > worst:
+            worst = took
+        if ticks_diff(now, stats_at) >= 5000:
+            secs = ticks_diff(now, stats_at) / 1000
+            print(
+                "loop %d Hz, worst %d ms | refresh %.1f fps, worst %d ms | free %d%s"
+                % (loops / secs, worst, ui.refreshes / secs, ui.refresh_ms_max,
+                   gc.mem_free(), " | KEY EVENTS OVERFLOWED" if hw.keys.events.overflowed else "")
+            )
+            # overflowed is read-only and sticky (only events.clear() resets it,
+            # which would drop queued presses), so it's reported, not reset.
+            loops = worst = ui.refreshes = ui.refresh_ms_max = 0
+            stats_at = now

@@ -5,3 +5,4 @@ host/config.local.*
 *.token
 .cache*
 .env
+.venv/
