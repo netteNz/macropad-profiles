@@ -118,7 +118,11 @@ They run on CPython with the HID libraries installed and USB stubbed:
 
 ## Roadmap
 
-Phase 2 adds a Windows host companion. With it, profiles can switch
-automatically to match the focused app, and features such as Spotify's own
-volume can use the host. Until it exists, actions that need the host fall back
-to plain HID. See `PHASE2_PLAN.md`.
+- **Windows host companion (Phase 2):** profiles switch automatically to
+  match the focused app, and features such as Spotify's own volume can use the
+  host. Until it exists, actions that need the host fall back to plain HID. See
+  `PHASE2_PLAN.md`.
+- **Extra panels over I²C:** other control panels connect through an
+  [Adafruit PCA9548A](https://www.adafruit.com/product/2717) 8-channel I²C
+  multiplexer, and some profiles will extend onto them. The feature set is
+  still being worked out.
