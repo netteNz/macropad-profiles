@@ -30,6 +30,10 @@ software is needed.
   blocking, so a delay in one key never stalls another.
 - **OLED:** shows the profile name and key labels, with overlays for the
   picker and volume changes.
+- **Second OLED (optional):** an SSD1306 128×64 panel on the STEMMA QT port
+  shows the profile name, plus ripples from each key press, a wave that
+  follows the knob, and drifting stars when idle. Without it, the pad runs as
+  usual.
 - **LEDs:** static per-key colors or a rainbow cycle. Held keys light up white.
 - The last-used profile is restored after a reset.
 
@@ -54,7 +58,7 @@ python -m venv .venv
 
 `tools/deploy.py` copies only the files that changed and writes `code.py`
 last. It accepts `--dry-run` to preview, and `--prune` to delete stale files
-under `ui/` and `profiles/`. Edit the files in `firmware/` and deploy; don't
+under `ui/`, `profiles/` and `panel/`. Edit the files in `firmware/` and deploy; don't
 edit the board drive directly, because every write reloads the board.
 
 ## Adding a profile
@@ -97,6 +101,7 @@ firmware/            Everything that goes on the board
   hw.py              Hardware setup (keys, encoder, display, HID)
   actions.py         Non-blocking macro runner
   gestures.py        Encoder gesture state machine
+  panel/             Second OLED on STEMMA QT (raw SSD1306 driver, canvas, art)
   profile_loader.py  Profile loading, validation, last-used profile
   leds.py            NeoPixel modes
   ui/                OLED views (keymap, picker, volume)
@@ -122,6 +127,8 @@ They run on CPython with the HID libraries installed and USB stubbed:
   match the focused app, and features such as Spotify's own volume can use the
   host. Until it exists, actions that need the host fall back to plain HID. See
   `PHASE2_PLAN.md`.
+- **Audio visualizer on the second OLED:** the Phase 2 host sends spectrum
+  bars, and the second panel shows them instead of the idle art.
 - **Extra panels over I²C:** other control panels connect through an
   Adafruit PCA9548A 8-channel I²C
   multiplexer, and some profiles will extend onto them. The feature set is
