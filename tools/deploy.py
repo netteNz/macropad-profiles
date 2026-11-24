@@ -2,7 +2,7 @@
 
 Every write to CIRCUITPY makes the board auto-reload, so this copies only
 files whose contents differ, writes code.py last, and leaves lib/ to circup.
-Use --prune to delete board files under ui/ and profiles/ that no longer
+Use --prune to delete board files under ui/, profiles/ and panel/ that no longer
 exist in firmware/ (nothing outside those folders is ever deleted).
 
     python tools/deploy.py [--drive F:\\] [--prune] [--dry-run]
@@ -16,7 +16,7 @@ import sys
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware")
 SKIP_DIRS = {"tests", "__pycache__", "lib"}
 SKIP_FILES = {"requirements.txt"}
-PRUNE_DIRS = ("ui", "profiles")
+PRUNE_DIRS = ("ui", "profiles", "panel")
 
 
 def firmware_files():

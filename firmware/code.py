@@ -12,6 +12,7 @@ import profile_loader
 from actions import KNOB, PRESS, Runner
 from gestures import Encoder
 from leds import Leds
+from panel.art import Scene
 from ui.keymap import KeymapView
 from ui.manager import UI
 from ui.picker import Picker
@@ -27,6 +28,8 @@ volume = VolumeOverlay()
 leds = Leds(hw.pixels)
 runner = Runner(hw.keyboard, hw.consumer, hw.layout)
 encoder = Encoder()
+panel = hw.panel  # second OLED on STEMMA QT, or None
+scene = Scene(panel.canvas) if panel else None
 
 profiles = profile_loader.load_all()
 if not profiles:
@@ -44,9 +47,13 @@ def set_profile(i):
     runner.release_all()
     keymap.set_profile(current)
     leds.set_profile(current)
+    if scene:
+        scene.set_title(current["name"])
 
 
 def on_turn(delta, now):
+    if scene:
+        scene.knob(delta)
     knob = current["knob"]
     if knob in ("system_volume", "spotify_volume"):  # spotify_volume needs the host (Phase 2)
         code = CC.VOLUME_INCREMENT if delta > 0 else CC.VOLUME_DECREMENT
@@ -114,6 +121,8 @@ while True:
                 on_gesture(g, now)
         elif event.pressed:
             leds.set_held(k, True)
+            if scene:
+                scene.key(k, now)
             runner.start(k, current["macros"][k][2], now=now)
         else:
             leds.set_held(k, False)
@@ -124,6 +133,9 @@ while True:
     runner.tick(now)
     leds.tick(now)
     ui.tick(now)
+    if panel:
+        scene.tick(now)
+        panel.flush_step()
 
     if DEBUG:
         loops += 1
@@ -133,10 +145,13 @@ while True:
         if ticks_diff(now, stats_at) >= 5000:
             secs = ticks_diff(now, stats_at) / 1000
             print(
-                "loop %d Hz, worst %d ms | refresh %.1f fps, worst %d ms | free %d%s"
+                "loop %d Hz, worst %d ms | refresh %.1f fps, worst %d ms | panel %s | free %d%s"
                 % (loops / secs, worst, ui.refreshes / secs, ui.refresh_ms_max,
+                   ("page worst %d ms" % panel.flush_ms_max) if panel and panel.alive else "off",
                    gc.mem_free(), " | KEY EVENTS OVERFLOWED" if hw.keys.events.overflowed else "")
             )
+            if panel:
+                panel.flush_ms_max = 0
             # overflowed is read-only and sticky (only events.clear() resets it,
             # which would drop queued presses), so it's reported, not reset.
             loops = worst = ui.refreshes = ui.refresh_ms_max = 0
