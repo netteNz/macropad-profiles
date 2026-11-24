@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-CircuitPython firmware for an Adafruit MacroPad RP2040 (12 keys, rotary encoder with push switch, 12 NeoPixels, 128×64 mono SH1106 OLED). It provides per-app key profiles, encoder gestures and an OLED UI. `docs/handoff.md` is the full spec and phase plan; `PHASE2_PLAN.md` is the (parked) plan for a Windows host daemon. `Macropad_Hotkeys/` is the old Adafruit Hotkeys II project kept for reference. It's gitignored, so don't edit it.
+CircuitPython firmware for an Adafruit MacroPad RP2040 (12 keys, rotary encoder with push switch, 12 NeoPixels, 128×64 mono SH1106 OLED), plus an optional second OLED on the STEMMA QT port (see "Second OLED panel" below). It provides per-app key profiles, encoder gestures and an OLED UI. `docs/handoff.md` is the full spec and phase plan; `PHASE2_PLAN.md` is the (parked) plan for a Windows host daemon. `Macropad_Hotkeys/` is the old Adafruit Hotkeys II project kept for reference. It's gitignored, so don't edit it.
 
 ## Commands
 
@@ -41,6 +41,16 @@ Test deps are listed in `firmware/tests/requirements.txt`. `firmware/tests/_path
 - **`ui/manager.py`**: one base view (`keymap` for now) plus at most one overlay (picker, volume), chosen by priority. Overlays time out after 1.2 s; the picker stays up until the switch is released. `display.auto_refresh` is off, and the manager calls `refresh()` only when a view is `dirty`, at most every 33 ms. Views keep their displayio objects and mutate them instead of rebuilding. `terminalio` is ASCII-only.
 - **`panel/`**: the optional second OLED (SSD1306 128×64, yellow band = rows 0–15) on the STEMMA QT port. CircuitPython allows only one displayio display and `board.DISPLAY` holds it, so `oled.py` drives the panel with raw I²C writes. `hw.panel` is `None` when no panel answers at 0x3C/0x3D, and an I²C error at runtime disables the panel without crashing. `writeto` blocks, so `flush_step()` sends at most one dirty 128-byte page per loop pass, about 4 ms at 400 kHz. `canvas.py` draws into the page-layout buffer and marks pages dirty; it's pure logic, tested on the host. `art.py` draws the profile name in the yellow band, plus key ripples, a knob wave and stars below it. It uses integer tables only, so frames don't allocate.
 - **`leds.py`**: `"static"` shows each macro's color (`0x000000` = off), `"rainbow"` cycles over time, and held keys show white.
+
+## Second OLED panel (current state, Nov 2026)
+
+- **Hardware:** one Elegoo SSD1306 128×64 (yellow rows 0–15, blue rows 16–63) at 0x3C, plugged straight into STEMMA QT. No mux yet. Built in PR #6 and confirmed working on the board.
+- **Bus:** `hw.PANEL_HZ = 400000`. 1 MHz (the RP2040 max) hasn't been tried. `Oled(..., flip=True)` rotates it 180°, but `hw.py` currently uses the default orientation.
+- **What it shows:** pad-only reactive art from `panel/art.py`'s `Scene`. The profile name sits in the yellow band. Below it are a ripple from the pressed key's 3×4 grid position, a sine wave that scrolls with knob turns and fades out, and drifting stars. It runs at about 30 fps while something moves and about 15 fps when only the stars drift, and it sends whole frames only. `code.py` feeds it events through `scene.key()`, `scene.knob()` and `scene.set_title()`.
+- **Measured cost:** the worst page write takes about 4 ms. The loop runs at about 960 Hz with the panel and about 2050 Hz without it. The worst loop pass is 13–14 ms, probably from frame rendering (not profiled yet). With `DEBUG` on, the loop stats line prints `panel page worst N ms`.
+- **Known limits:** the knob wave gets coarse on fast turns, because the main OLED's volume-overlay refresh (25–45 ms) stalls the loop. Ema wants a better knob/volume visual than the sine.
+- **Next:** the pad has no mic and can't hear the PC, so audio-reactive visuals need the host. The Phase 2 host FFT bars go on *this* panel, not the built-in OLED; `PHASE2_PLAN.md` still says the built-in one and needs updating. Ideas for later: a PCA9548A mux with 3 panels, plus now-playing info and weather, all of which need the host.
+- **Tests:** `firmware/tests/test_panel.py` covers `canvas`, `oled` (with a fake I²C) and `art` on the host.
 
 ## Profiles (`firmware/profiles/NN_name.py`)
 

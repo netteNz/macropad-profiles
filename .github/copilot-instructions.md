@@ -15,6 +15,10 @@ minutes. See `CLAUDE.md` for the architecture.
 - Bugs a person can hit with the real profiles in `firmware/profiles/` and
   normal hands on the keys and knob.
 - Wrong or misleading shortcuts in a profile.
+- Second OLED (`firmware/panel/`): anything that can crash the pad when the
+  panel is missing or an I²C write fails (`hw.panel` may be `None`), any
+  flush that sends more than one page per loop pass, or any per-frame
+  allocation in `art.py`.
 
 ## Please skip
 
@@ -33,5 +37,8 @@ minutes. See `CLAUDE.md` for the architecture.
 - CircuitPython, not CPython: no threads or asyncio here, a limited `math`,
   and `adafruit_ticks` for time. Tests under `firmware/tests/` run on
   host CPython with stubs.
+- Only one displayio display is allowed and the built-in OLED holds it, so
+  the second SSD1306 (STEMMA QT, 0x3C) is driven with raw I²C writes on
+  purpose. Don't suggest `adafruit_displayio_ssd1306`.
 - `adafruit_hid` holds at most six regular keys and one consumer code at a
   time.
