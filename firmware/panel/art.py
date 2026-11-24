@@ -103,18 +103,17 @@ class Scene:
                     buf[(y >> 3) * W + x] |= 1 << (y & 7)
             self.amp -= max(1, amp >> 4)
 
-        # Ripples
-        live = []
-        for rp in self.ripples:
+        # Ripples (oldest first, so expired ones sit at the front; pop in place
+        # rather than rebuilding the list every frame)
+        rips = self.ripples
+        while rips and ticks_diff(now, rips[0][2]) // RIPPLE_MS_PER_PX > RIPPLE_MAX_R:
+            rips.pop(0)
+        for rp in rips:
             r = ticks_diff(now, rp[2]) // RIPPLE_MS_PER_PX
-            if r > RIPPLE_MAX_R:
-                continue
-            live.append(rp)
             cx, cy = rp[0], rp[1]
             for dx, dy in RING:
                 x = cx + ((r * dx) >> 7)
                 y = cy + ((r * dy) >> 7)
                 if 0 <= x < W and TOP <= y < H:
                     buf[(y >> 3) * W + x] |= 1 << (y & 7)
-        self.ripples = live
         return True

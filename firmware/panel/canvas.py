@@ -7,6 +7,7 @@ from panel import font5x7
 W = 128
 H = 64
 PAGES = 8
+_ZERO_PAGE = bytes(W)
 
 
 class Canvas:
@@ -17,8 +18,8 @@ class Canvas:
     def clear(self, p0=0, p1=PAGES):
         """Blank pages p0..p1-1 (whole 8-row bands, fast slice fill)."""
         b = self.buf
-        b[p0 * W:p1 * W] = bytes((p1 - p0) * W)
         for p in range(p0, p1):
+            b[p * W:(p + 1) * W] = _ZERO_PAGE  # reused: no per-frame allocation
             self.dirty |= 1 << p
 
     def pixel(self, x, y, on=True):
