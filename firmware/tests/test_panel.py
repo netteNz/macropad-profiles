@@ -99,6 +99,12 @@ class SceneTest(unittest.TestCase):
         import random
         self.c = Canvas()
         self.s = Scene(self.c, rng=random.Random(1))
+        self.c.dirty = 0  # as if the panel had sent everything
+
+    def tick(self, now):
+        drew = self.s.tick(now)
+        self.c.dirty = 0  # the panel takes the whole frame
+        return drew
 
     def yellow(self):
         return bytes(self.c.buf[:256])
@@ -108,7 +114,7 @@ class SceneTest(unittest.TestCase):
         band = self.yellow()
         self.assertTrue(any(band))
         self.assertFalse(any(self.c.buf[256:]))
-        self.s.tick(0)
+        self.assertTrue(self.s.tick(0))  # a dirty title doesn't hold frames back
         self.assertEqual(self.yellow(), band)  # frames never touch the title
 
     def test_long_title_truncated(self):
@@ -127,8 +133,8 @@ class SceneTest(unittest.TestCase):
         for k in range(10):
             self.s.key(k, 0)
         self.assertEqual(len(self.s.ripples), 6)
-        self.assertTrue(self.s.tick(0))
-        self.s.tick((RIPPLE_MAX_R + 1) * RIPPLE_MS_PER_PX)
+        self.assertTrue(self.tick(0))
+        self.tick((RIPPLE_MAX_R + 1) * RIPPLE_MS_PER_PX)
         self.assertEqual(self.s.ripples, [])
 
     def test_wave_grows_then_decays(self):
@@ -138,7 +144,7 @@ class SceneTest(unittest.TestCase):
         self.assertEqual(self.s.amp, 22)
         t = 0
         while self.s.amp and t < 10000:
-            self.s.tick(t)
+            self.tick(t)
             t += 33
         self.assertEqual(self.s.amp, 0)
         self.assertLess(t, 3000)
@@ -148,10 +154,40 @@ class SceneTest(unittest.TestCase):
         self.s.knob(5)
         self.assertTrue(self.s.tick(0))
         self.assertFalse(any(self.yellow()))
-        self.assertFalse(self.s.tick(10))  # inside the frame throttle
         self.c.dirty = 0
+        self.assertFalse(self.s.tick(10))  # inside the frame throttle
         self.assertTrue(self.s.tick(33))
         self.assertEqual(self.c.dirty & 0b11, 0)  # title pages not resent
+
+    def test_waits_for_previous_frame(self):
+        self.s.knob(3)
+        self.assertTrue(self.s.tick(0))
+        self.assertFalse(self.s.tick(500))  # blue pages still unsent
+        self.c.dirty = 0
+        self.assertTrue(self.s.tick(500))
+
+    def test_wave_is_a_continuous_line(self):
+        self.s.stars = []
+        self.s.knob(4)
+        self.tick(0)
+        for x in range(128):
+            col = sum(self.c.buf[p * 128 + x] for p in range(2, 8))
+            self.assertTrue(col, "gap at x=%d" % x)
+
+    def test_wave_scroll_follows_time_not_frames(self):
+        a, b = Scene(Canvas(), rng=__import__("random").Random(1)), Scene(Canvas(), rng=__import__("random").Random(1))
+        for sc in (a, b):
+            sc.c.dirty = 0
+            sc.knob(3)
+        for t in range(0, 200, 33):  # fast frames
+            a.tick(t)
+            a.c.dirty = 0
+        b.tick(0)
+        b.c.dirty = 0
+        for t in (99, 198):  # slow frames (stalled loop)
+            b.tick(t)
+            b.c.dirty = 0
+        self.assertLessEqual(abs(a._phase16 - b._phase16), 16)
 
 
 class OledTest(unittest.TestCase):

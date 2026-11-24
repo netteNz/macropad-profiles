@@ -6,7 +6,8 @@
 # - idle drift: a few stars sliding left, always there underneath
 # Integer math with precomputed tables only, so frames don't allocate floats
 # (GC pauses stall the loop). Paced off ticks: ~30 fps while something moves,
-# ~15 fps when only the stars drift.
+# ~15 fps when only the stars drift, and never faster than the panel can
+# take whole frames.
 import math
 import random
 
@@ -24,6 +25,10 @@ RING_PTS = 24
 WAVE_MAX = 22  # amplitude cap in px
 WAVE_PER_DETENT = 6
 STARS = 10
+WAVE_PX_PER_S = 60  # scroll speed
+WAVE_DECAY_MS = 600  # proportional fade time constant
+MAX_DT = 100  # cap on catch-up after a long stall
+BLUE_PAGES = 0xFC  # pages 2-7
 TITLE_CHARS = 21
 
 # 64-entry sine and RING_PTS-entry cos/sin, scaled by 127.
@@ -43,11 +48,11 @@ class Scene:
         self._rng = rng or random  # CircuitPython's random has no Random class
         self._last = None
         self.ripples = []  # [cx, cy, t0]
-        self.amp = 0
+        self._amp16 = 0  # wave amplitude in 1/16 px
         self._dir = 1
-        self._phase = 0
+        self._phase16 = 0  # wave scroll in 1/16 px
         r = self._rng
-        # x in 1/16 px, y, speed in 1/16 px per frame
+        # x in 1/16 px, y, speed in 1/16 px per FRAME_MS
         self.stars = [[r.randrange(W * 16), r.randrange(TOP, H), r.randrange(4, 20)]
                       for _ in range(STARS)]
         self.title = None
@@ -69,39 +74,66 @@ class Scene:
     def knob(self, delta):
         if delta:
             self._dir = 1 if delta > 0 else -1
-            self.amp = min(WAVE_MAX, self.amp + WAVE_PER_DETENT * abs(delta))
+            self._amp16 = min(WAVE_MAX * 16, self._amp16 + WAVE_PER_DETENT * 16 * abs(delta))
+
+    @property
+    def amp(self):
+        """Wave amplitude in whole pixels."""
+        return self._amp16 >> 4
 
     def busy(self):
-        return bool(self.ripples) or self.amp > 0
+        return bool(self.ripples) or self._amp16 > 0
 
     def tick(self, now):
-        """Render a frame if one is due. Returns True when it drew."""
-        frame = FRAME_MS if self.busy() else IDLE_FRAME_MS
-        if self._last is not None and ticks_diff(now, self._last) < frame:
-            return False
-        self._last = now
+        """Render a frame if one is due. Returns True when it drew.
+
+        A new frame waits until the previous one has fully reached the panel
+        (no blue page still dirty), so the panel never shows strips from two
+        different frames, e.g. while a main-OLED refresh stalls the loop.
+        Motion is scaled by elapsed time, so a slower frame rate doesn't
+        slow the animation down, it only makes it coarser."""
         c = self.c
+        if c.dirty & BLUE_PAGES:
+            return False
+        frame = FRAME_MS if self.busy() else IDLE_FRAME_MS
+        if self._last is None:
+            dt = FRAME_MS
+        else:
+            dt = ticks_diff(now, self._last)
+            if dt < frame:
+                return False
+            dt = min(dt, MAX_DT)
+        self._last = now
         c.clear(TOP >> 3, H >> 3)
         buf = c.buf
 
-        # Stars
+        # Stars: speed is 1/16 px per FRAME_MS
         for s in self.stars:
-            s[0] -= s[2]
+            s[0] -= s[2] * dt // FRAME_MS
             if s[0] < 0:
                 s[0] += W * 16
                 s[1] = self._rng.randrange(TOP, H)
             y = s[1]
             buf[(y >> 3) * W + (s[0] >> 4)] |= 1 << (y & 7)
 
-        # Knob wave: 2-px steps, 64-px wavelength
-        if self.amp > 0:
-            self._phase = (self._phase + 2 * self._dir) & 63
-            amp, ph, mid = self.amp, self._phase, (TOP + H) // 2
-            for x in range(0, W, 2):
+        # Knob wave: a continuous line, 64-px wavelength
+        if self._amp16 > 0:
+            self._phase16 = (self._phase16 + self._dir * dt * WAVE_PX_PER_S * 16 // 1000) & 1023
+            amp, ph, mid = self._amp16 >> 4, (self._phase16 >> 4) & 63, (TOP + H) // 2
+            prev = None
+            for x in range(W):
                 y = mid + ((amp * SIN64[(x - ph) & 63]) >> 7)
-                if TOP <= y < H:
-                    buf[(y >> 3) * W + x] |= 1 << (y & 7)
-            self.amp -= max(1, amp >> 4)
+                if prev is None or prev == y:
+                    lo = hi = y
+                elif prev < y:  # join to the previous column, no gaps
+                    lo, hi = prev + 1, y
+                else:
+                    lo, hi = y, prev - 1
+                for yy in range(max(lo, TOP), min(hi, H - 1) + 1):
+                    buf[(yy >> 3) * W + x] |= 1 << (yy & 7)
+                prev = y
+            # Fade: proportional plus a small constant, so it always ends (~1.2 s from max)
+            self._amp16 = max(0, self._amp16 - self._amp16 * dt // WAVE_DECAY_MS - dt // 8)
 
         # Ripples (oldest first, so expired ones sit at the front; pop in place
         # rather than rebuilding the list every frame)
