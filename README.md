@@ -30,7 +30,8 @@ software is needed.
   blocking, so a delay in one key never stalls another.
 - **OLED:** shows the profile name and key labels, with overlays for the
   picker and volume changes.
-- **Second OLED (optional):** an SSD1306 128×64 panel on the STEMMA QT port
+- **Extra OLEDs (optional):** an SSD1306 128×64 panel on the STEMMA QT port, or
+  several behind a PCA9548A I²C mux (one per channel). Each
   shows the profile name, plus ripples from each key press, a wave that
   follows the knob, and drifting stars when idle. Without it, the pad runs as
   usual.

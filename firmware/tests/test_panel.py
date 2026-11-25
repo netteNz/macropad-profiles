@@ -4,6 +4,7 @@ import _paths  # noqa: F401
 from panel import font5x7
 from panel.art import RIPPLE_MAX_R, RIPPLE_MS_PER_PX, TOP, Scene, key_center
 from panel.canvas import Canvas, text_width
+from panel.mux import Mux, find_mux, open_panels
 from panel.oled import _INIT, Oled, find
 
 
@@ -244,6 +245,110 @@ class OledTest(unittest.TestCase):
         self.assertFalse(self.o.flush_step())
         self.assertFalse(self.o.alive)
         self.assertFalse(self.o.flush_step())
+
+
+class FakeMuxBus(FakeI2C):
+    """A bus with a mux at 0x70; each channel has its own devices."""
+
+    def __init__(self, channels, mux=0x70):
+        super().__init__(present=(mux,))
+        self.mux = mux
+        self.channels = channels  # {ch: (addrs...)}
+        self.mask = 0
+        self.dead = set()  # channels whose devices raise on write
+
+    def scan(self):
+        found = [self.mux]
+        for ch, addrs in self.channels.items():
+            if self.mask & (1 << ch):
+                found.extend(addrs)
+        return found
+
+    def writeto(self, addr, data):
+        assert self.locked
+        if addr == self.mux:
+            self.mask = data[0]
+        elif any(self.mask & (1 << ch) for ch in self.dead):
+            raise OSError(5)
+        self.writes.append((addr, bytes(data)))
+
+
+class MuxTest(unittest.TestCase):
+    def test_find_mux(self):
+        self.assertEqual(find_mux(FakeI2C((0x3C, 0x71))), 0x71)
+        self.assertIsNone(find_mux(FakeI2C((0x3C,))))
+
+    def test_select_only_when_changed(self):
+        bus = FakeMuxBus({})
+        m = Mux(bus, 0x70)
+        self.assertEqual(bus.writes, [(0x70, bytes((0,)))])
+        bus.writes.clear()
+        bus.try_lock()
+        m.select_locked(3)
+        m.select_locked(3)
+        m.select_locked(1)
+        bus.unlock()
+        self.assertEqual(bus.writes, [(0x70, bytes((8,))), (0x70, bytes((2,)))])
+
+    def test_no_mux_returns_none(self):
+        self.assertIsNone(open_panels(FakeI2C((0x3C,))))
+
+    def test_mux_without_panels(self):
+        panels, msg = open_panels(FakeMuxBus({}))
+        self.assertEqual(panels, [])
+        self.assertIn("no panels", msg)
+
+    def test_scan_ignores_mux_address(self):
+        bus = FakeMuxBus({2: (0x3C,)})
+        c = Mux(bus, 0x70).channel(2)
+        self.assertIsNone(find(Mux(bus, 0x70).channel(0)))
+        self.assertEqual(find(c), 0x3C)
+
+    def test_two_panels_each_page_on_its_channel(self):
+        bus = FakeMuxBus({0: (0x3C,), 1: (0x3C,)})
+        panels, msg = open_panels(bus)
+        self.assertEqual(len(panels), 2)
+        self.assertIn("ch 0, ch 1", msg)
+        bus.writes.clear()
+        a, b = panels
+        a.flush_step()  # cmd + data, both on ch 0: one select
+        a.flush_step()  # still ch 0: no select
+        b.flush_step()  # switch to ch 1
+        sel = [w[1][0] for w in bus.writes if w[0] == 0x70]
+        self.assertEqual(sel, [1 << 0, 1 << 1])  # boot scan left the mux on ch 7
+        self.assertEqual(len([w for w in bus.writes if w[0] == 0x3C]), 6)
+
+    def test_selects_track_channel(self):
+        bus = FakeMuxBus({0: (0x3C,), 1: (0x3C,)})
+        a, b = open_panels(bus)[0]
+        log = []
+        real = bus.writeto
+
+        def spy(addr, data):
+            real(addr, data)
+            if addr == 0x3C:
+                log.append(bus.mask)
+        bus.writeto = spy
+        for _ in range(4):
+            a.flush_step()
+            b.flush_step()
+        self.assertEqual(log, [1, 1, 2, 2] * 4)
+
+    def test_dead_channel_disables_only_that_panel(self):
+        bus = FakeMuxBus({0: (0x3C,), 1: (0x3C,)})
+        a, b = open_panels(bus)[0]
+        bus.dead.add(1)
+        self.assertFalse(b.flush_step())
+        self.assertFalse(b.alive)
+        self.assertTrue(a.flush_step())
+        self.assertTrue(a.alive)
+
+    def test_panel_failing_init_is_skipped(self):
+        bus = FakeMuxBus({0: (0x3C,), 1: (0x3C,)})
+        bus.dead.add(0)
+        panels, msg = open_panels(bus)
+        self.assertEqual(len(panels), 1)
+        self.assertIn("ch 0 failed", msg)
 
 
 if __name__ == "__main__":
