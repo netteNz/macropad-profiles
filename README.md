@@ -48,13 +48,16 @@ software is needed.
 
 ```powershell
 python -m venv .venv
-.venv\Scripts\pip install circup -r firmware/tests/requirements.txt
+.venv\Scripts\pip install circup -r firmware/tests/requirements.txt -r tools/requirements.txt
 
 # Install board libraries onto the CIRCUITPY drive
 .venv\Scripts\circup install -r firmware/requirements.txt
 
 # Copy the firmware to the board (default drive F:\)
 .venv\Scripts\python tools\deploy.py --drive F:\
+
+# Watch the board's serial output (--reload restarts code.py first)
+.venv\Scripts\python tools\serial_console.py --reload
 ```
 
 `tools/deploy.py` copies only the files that changed and writes `code.py`

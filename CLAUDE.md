@@ -15,6 +15,9 @@ All commands run from the repo root on Windows, using the repo `.venv`.
 .venv\Scripts\python -m unittest discover -s firmware/tests -p test_profiles.py
 .venv\Scripts\python -m unittest discover -s firmware/tests -k test_real_profile_files_validate
 
+# Read the board's serial output (--reload soft-restarts code.py; interrupts the pad)
+.venv\Scripts\python tools\serial_console.py [--reload] [--seconds N] [--port COMx]
+
 # Deploy changed files to the board (CIRCUITPY drive, default F:\)
 .venv\Scripts\python tools\deploy.py [--drive F:\] [--dry-run] [--prune]
 
@@ -44,7 +47,7 @@ Test deps are listed in `firmware/tests/requirements.txt`. `firmware/tests/_path
 
 ## Second OLED panel (current state, Nov 2026)
 
-- **Hardware:** one Elegoo SSD1306 128×64 (yellow rows 0–15, blue rows 16–63) at 0x3C, plugged straight into STEMMA QT. Built in PR #6 and confirmed working on the board. Mux support (PCA9548A at 0x70, two panels on ch 0/1, each running its own `Scene`) is written and host-tested; board bring-up in progress.
+- **Hardware:** one Elegoo SSD1306 128×64 (yellow rows 0–15, blue rows 16–63) at 0x3C, plugged straight into STEMMA QT. Built in PR #6 and confirmed working on the board. Mux support (PCA9548A at 0x70, two panels on ch 0/1, each running its own `Scene`) is board-tested (PR #7): mux only, one panel, two panels, and pulling one panel's SDA mid-run. With two panels at 400 kHz the bus is ~90% busy and the loop drops to ~200 Hz.
 - **Bus:** `hw.PANEL_HZ = 400000`. 1 MHz (the RP2040 max) hasn't been tried. `Oled(..., flip=True)` rotates it 180°, but `hw.py` currently uses the default orientation.
 - **What it shows:** pad-only reactive art from `panel/art.py`'s `Scene`. The profile name sits in the yellow band. Below it are a ripple from the pressed key's 3×4 grid position, a sine wave that scrolls with knob turns and fades out, and drifting stars. It runs at about 30 fps while something moves and about 15 fps when only the stars drift, and it sends whole frames only. `code.py` feeds it events through `scene.key()`, `scene.knob()` and `scene.set_title()`.
 - **Measured cost:** the worst page write takes about 4 ms. The loop runs at about 960 Hz with the panel and about 2050 Hz without it. The worst loop pass is 13–14 ms, probably from frame rendering (not profiled yet). With `DEBUG` on, the loop stats line prints `panel page worst N ms`.

@@ -1,0 +1,2 @@
+# Host-side tool deps (tools/serial_console.py)
+pyserial

@@ -20,10 +20,13 @@ ADAFRUIT_VID = 0x239A
 
 
 def find_port():
-    for p in list_ports.comports():
-        if p.vid == ADAFRUIT_VID:
-            return p.device
-    return None
+    ports = [p for p in list_ports.comports() if p.vid == ADAFRUIT_VID]
+    if len(ports) > 1:
+        # With usb_cdc data enabled the board shows two ports with the same
+        # VID; guessing wrong would send --reload's Ctrl+C/D to the data port.
+        sys.exit("Several CircuitPython ports (%s); pass --port COMx for the console"
+                 % ", ".join(p.device for p in ports))
+    return ports[0].device if ports else None
 
 
 def main():
