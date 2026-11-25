@@ -30,7 +30,8 @@ software is needed.
   blocking, so a delay in one key never stalls another.
 - **OLED:** shows the profile name and key labels, with overlays for the
   picker and volume changes.
-- **Second OLED (optional):** an SSD1306 128×64 panel on the STEMMA QT port
+- **Extra OLEDs (optional):** an SSD1306 128×64 panel on the STEMMA QT port, or
+  several behind a PCA9548A I²C mux (one per channel). Each
   shows the profile name, plus ripples from each key press, a wave that
   follows the knob, and drifting stars when idle. Without it, the pad runs as
   usual.
@@ -47,13 +48,16 @@ software is needed.
 
 ```powershell
 python -m venv .venv
-.venv\Scripts\pip install circup -r firmware/tests/requirements.txt
+.venv\Scripts\pip install circup -r firmware/tests/requirements.txt -r tools/requirements.txt
 
 # Install board libraries onto the CIRCUITPY drive
 .venv\Scripts\circup install -r firmware/requirements.txt
 
 # Copy the firmware to the board (default drive F:\)
 .venv\Scripts\python tools\deploy.py --drive F:\
+
+# Watch the board's serial output (--reload restarts code.py first)
+.venv\Scripts\python tools\serial_console.py --reload
 ```
 
 `tools/deploy.py` copies only the files that changed and writes `code.py`

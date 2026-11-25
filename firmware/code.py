@@ -28,8 +28,22 @@ volume = VolumeOverlay()
 leds = Leds(hw.pixels)
 runner = Runner(hw.keyboard, hw.consumer, hw.layout)
 encoder = Encoder()
-panel = hw.panel  # second OLED on STEMMA QT, or None
-scene = Scene(panel.canvas) if panel else None
+panels = hw.panels  # extra OLEDs on STEMMA QT (direct or behind a mux), may be empty
+scenes = [Scene(p.canvas) for p in panels]
+tick_i = 0  # round-robin: one scene render per loop pass
+flush_i = 0  # round-robin: one page write per loop pass, across all panels
+
+
+def flush_any():
+    # Send one dirty page from the next panel that has one. All panels share
+    # one I2C bus, so this keeps the worst loop pass at one page write.
+    global flush_i
+    n = len(panels)
+    for j in range(n):
+        i = (flush_i + j) % n
+        if panels[i].flush_step():
+            flush_i = (i + 1) % n
+            return
 
 profiles = profile_loader.load_all()
 if not profiles:
@@ -47,13 +61,13 @@ def set_profile(i):
     runner.release_all()
     keymap.set_profile(current)
     leds.set_profile(current)
-    if scene:
-        scene.set_title(current["name"])
+    for s in scenes:
+        s.set_title(current["name"])
 
 
 def on_turn(delta, now):
-    if scene:
-        scene.knob(delta)
+    for s in scenes:
+        s.knob(delta)
     knob = current["knob"]
     if knob in ("system_volume", "spotify_volume"):  # spotify_volume needs the host (Phase 2)
         code = CC.VOLUME_INCREMENT if delta > 0 else CC.VOLUME_DECREMENT
@@ -89,6 +103,14 @@ def on_gesture(g, now):
             profile_loader.save_last(current["name"])
 
 
+def panel_stats():
+    alive = [p for p in panels if p.alive]
+    if not alive:
+        return "off"
+    return "page worst %d ms (%d/%d alive)" % (
+        max(p.flush_ms_max for p in alive), len(alive), len(panels))
+
+
 def poll_encoder(now):
     global last_pos
     pos = hw.encoder_position()
@@ -121,8 +143,8 @@ while True:
                 on_gesture(g, now)
         elif event.pressed:
             leds.set_held(k, True)
-            if scene:
-                scene.key(k, now)
+            for s in scenes:
+                s.key(k, now)
             runner.start(k, current["macros"][k][2], now=now)
         else:
             leds.set_held(k, False)
@@ -133,9 +155,11 @@ while True:
     runner.tick(now)
     leds.tick(now)
     ui.tick(now)
-    if panel:
-        scene.tick(now)
-        panel.flush_step()
+    if scenes:
+        # One render per pass: two scenes due together would double the stall.
+        scenes[tick_i].tick(now)
+        tick_i = (tick_i + 1) % len(scenes)
+        flush_any()
 
     if DEBUG:
         loops += 1
@@ -147,11 +171,11 @@ while True:
             print(
                 "loop %d Hz, worst %d ms | refresh %.1f fps, worst %d ms | panel %s | free %d%s"
                 % (loops / secs, worst, ui.refreshes / secs, ui.refresh_ms_max,
-                   ("page worst %d ms" % panel.flush_ms_max) if panel and panel.alive else "off",
+                   panel_stats(),
                    gc.mem_free(), " | KEY EVENTS OVERFLOWED" if hw.keys.events.overflowed else "")
             )
-            if panel:
-                panel.flush_ms_max = 0
+            for p in panels:
+                p.flush_ms_max = 0
             # overflowed is read-only and sticky (only events.clear() resets it,
             # which would drop queued presses), so it's reported, not reset.
             loops = worst = ui.refreshes = ui.refresh_ms_max = 0

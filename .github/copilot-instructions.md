@@ -16,7 +16,7 @@ minutes. See `CLAUDE.md` for the architecture.
   normal hands on the keys and knob.
 - Wrong or misleading shortcuts in a profile.
 - Second OLED (`firmware/panel/`): anything that can crash the pad when the
-  panel is missing or an I²C write fails (`hw.panel` may be `None`), any
+  panel is missing or an I²C write fails (`hw.panels` may be empty, and one panel behind the mux can die while the others run), any
   flush that sends more than one page per loop pass, or any per-frame
   allocation in `art.py`.
 

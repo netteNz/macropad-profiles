@@ -38,28 +38,35 @@ display.bus.send(_DISPLAY_WAKE, b"")
 PANEL_HZ = 400000  # SSD1306 spec; 1 MHz is the RP2040 max, try per module
 
 
-def _open_panel():
-    # Optional second OLED on the STEMMA QT port. Any failure (nothing
-    # plugged in, wrong address) leaves panel = None and the pad runs as before.
+def _open_panels():
+    # Optional extra OLEDs on the STEMMA QT port: either one SSD1306 plugged
+    # in directly, or several behind a PCA9548A mux. Any failure (nothing
+    # plugged in, wrong address) leaves an empty list and the pad runs as before.
     try:
         import busio
 
+        from panel.mux import open_panels
         from panel.oled import Oled, find
 
         i2c = busio.I2C(board.SCL, board.SDA, frequency=PANEL_HZ)
+        muxed = open_panels(i2c)
+        if muxed is not None:
+            found, msg = muxed
+            print("%s, %d kHz" % (msg, PANEL_HZ // 1000))
+            return found
         addr = find(i2c)
         if addr is None:
             i2c.deinit()
             print("panel: none found on STEMMA QT")
-            return None
+            return []
         print("panel: SSD1306 at 0x%02X, %d kHz" % (addr, PANEL_HZ // 1000))
-        return Oled(i2c, addr)
+        return [Oled(i2c, addr)]
     except Exception as e:  # noqa: BLE001 - never crash the pad over the panel
         print("panel: disabled (%s)" % e)
-        return None
+        return []
 
 
-panel = _open_panel()
+panels = _open_panels()
 
 keyboard = Keyboard(usb_hid.devices)
 consumer = ConsumerControl(usb_hid.devices)
