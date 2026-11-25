@@ -35,7 +35,7 @@ pixels = neopixel.NeoPixel(board.NEOPIXEL, 12, brightness=0.3, auto_write=False)
 display = board.DISPLAY
 display.bus.send(_DISPLAY_WAKE, b"")
 
-PANEL_HZ = 400000  # SSD1306 spec; 1 MHz is the RP2040 max, try per module
+PANEL_HZ = 1000000  # RP2040 max; SSD1306 spec is 400 kHz, revert if a panel glitches
 
 
 def _open_panels():
