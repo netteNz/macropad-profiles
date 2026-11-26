@@ -8,6 +8,7 @@ import sys
 
 PLAY_PAUSE = 0xCD  # ConsumerControlCode.PLAY_PAUSE
 KNOB_NAMES = ("system_volume", "spotify_volume")
+PANEL_NAMES = ("art", "spotify")  # scene on the extra OLEDs
 LABEL_MAX = 6
 _NVM_MAGIC = 0xA5
 _NVM_LEN = 32
@@ -84,6 +85,9 @@ def validate(app, fname):
     apps = app.get("apps", [])
     if not isinstance(apps, (list, tuple)) or not all(isinstance(a, str) for a in apps):
         raise ValueError(fname + ": apps must be a list of exe names")
+    panel = app.get("panel", "art")
+    if panel not in PANEL_NAMES:
+        raise ValueError("%s: panel must be one of %s" % (fname, ", ".join(PANEL_NAMES)))
     return {
         "name": _ascii(name),
         "order": int(app.get("order", 0)),
@@ -92,6 +96,7 @@ def validate(app, fname):
         "knob": _check_knob(app.get("knob", "system_volume"), fname),
         "press": _check_action(app.get("press", [[PLAY_PAUSE]]), fname + " press"),
         "leds": leds,
+        "panel": panel,
         "macros": out_macros,
     }
 

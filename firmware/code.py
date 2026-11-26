@@ -13,11 +13,16 @@ from actions import KNOB, PRESS, Runner
 from gestures import Encoder
 from leds import Leds
 from panel.art import Scene
+from panel.hostdata import HostData
+from panel.hud import HudScene
+from panel.spotify import RecordScene
+from panel.transport import Transport
 from ui.keymap import KeymapView
 from ui.manager import UI
 from ui.picker import Picker
 from ui.volume import VolumeOverlay
 
+DEMO = True  # fake clock + weather on the HUD until the PC helper exists (step 5)
 DEBUG = True  # loop/refresh stats on the serial console every 5 s; off once Phase 1 is signed off
 
 ui = UI(hw.display)
@@ -29,7 +34,14 @@ leds = Leds(hw.pixels)
 runner = Runner(hw.keyboard, hw.consumer, hw.layout)
 encoder = Encoder()
 panels = hw.panels  # extra OLEDs on STEMMA QT (direct or behind a mux), may be empty
-scenes = [Scene(p.canvas) for p in panels]
+transport = Transport()  # play state guessed from what the pad sends
+host_data = HostData()  # time/weather/moon from the PC helper (none yet)
+if DEMO:
+    from panel.demo import Demo
+
+    demo = Demo(host_data, ticks_ms())
+scenes = []  # one per panel, built from the profile's "panel" kind
+scene_kind = None
 tick_i = 0  # round-robin: one scene render per loop pass
 flush_i = 0  # round-robin: one page write per loop pass, across all panels
 
@@ -55,26 +67,53 @@ gc.collect()
 current = None
 
 
+def build_scenes(kind):
+    # "spotify": the record on the first panel, the HUD on the second; any
+    # others keep the ambient art.
+    out = []
+    for i, p in enumerate(panels):
+        if kind == "spotify" and i == 0:
+            out.append(RecordScene(p.canvas, transport))
+        elif kind == "spotify" and i == 1:
+            out.append(HudScene(p.canvas, transport, host_data))
+        else:
+            out.append(Scene(p.canvas))
+    return out
+
+
 def set_profile(i):
-    global current
+    global current, scenes, scene_kind, tick_i
     current = profiles[i]
     runner.release_all()
     keymap.set_profile(current)
     leds.set_profile(current)
+    if current["panel"] != scene_kind:
+        scene_kind = current["panel"]
+        scenes = []  # drop the old ones before building, to keep peak RAM down
+        gc.collect()
+        scenes = build_scenes(scene_kind)
+        tick_i = 0
     for s in scenes:
         s.set_title(current["name"])
 
 
+def panel_volume():
+    """True when volume shows on an extra panel, so the main OLED skips its
+    overlay (its refresh stalls the loop 25-45 ms, the fast-turn stutter)."""
+    return scene_kind == "spotify" and any(p.alive for p in panels)
+
+
 def on_turn(delta, now):
     for s in scenes:
-        s.knob(delta)
+        s.knob(delta, now)
     knob = current["knob"]
     if knob in ("system_volume", "spotify_volume"):  # spotify_volume needs the host (Phase 2)
         code = CC.VOLUME_INCREMENT if delta > 0 else CC.VOLUME_DECREMENT
         for _ in range(abs(delta)):
             runner.consumer_send(code)
         volume.bump(delta, now)
-        ui.show_overlay(volume, now)
+        if not panel_volume():
+            ui.show_overlay(volume, now)
     elif knob[0] == "keys":
         seq = knob[1] if delta > 0 else knob[2]
         for _ in range(abs(delta)):
@@ -87,9 +126,17 @@ def on_gesture(g, now):
     if name == "turn":
         on_turn(g[1], now)
     elif name == "press":
+        transport.on_action(current["press"], now)
         runner.start(PRESS, current["press"], tap=True, now=now)
     elif name == "long_press":
-        if not ui.toggle_base() and DEBUG:
+        if current["panel"] == "spotify":
+            # The pad can't see Spotify's real play state (no PC helper yet),
+            # so a long press corrects its guess without sending anything.
+            transport.play_toggle(now)
+            for s in scenes:
+                if isinstance(s, HudScene):
+                    s.key(-1, now)  # pop the status view to show the new state
+        elif not ui.toggle_base() and DEBUG:
             print("long-press: only one base view")
     elif name == "picker_open":
         picker.open([p["name"] for p in profiles], profiles.index(current))
@@ -126,6 +173,7 @@ last_pos = hw.encoder_position()
 
 loops = 0
 worst = 0
+scene_worst = [0] * 8  # per panel, ms
 stats_at = ticks_ms()
 
 while True:
@@ -145,19 +193,30 @@ while True:
             leds.set_held(k, True)
             for s in scenes:
                 s.key(k, now)
-            runner.start(k, current["macros"][k][2], now=now)
+            action = current["macros"][k][2]
+            transport.on_action(action, now)
+            runner.start(k, action, now=now)
         else:
             leds.set_held(k, False)
             runner.release(k)
 
     poll_encoder(now)
+    if DEMO:
+        demo.tick(now)
 
     runner.tick(now)
     leds.tick(now)
     ui.tick(now)
     if scenes:
         # One render per pass: two scenes due together would double the stall.
-        scenes[tick_i].tick(now)
+        if DEBUG:
+            t0 = ticks_ms()
+            scenes[tick_i].tick(now)
+            took = ticks_diff(ticks_ms(), t0)
+            if took > scene_worst[tick_i]:
+                scene_worst[tick_i] = took
+        else:
+            scenes[tick_i].tick(now)
         tick_i = (tick_i + 1) % len(scenes)
         flush_any()
 
@@ -169,14 +228,22 @@ while True:
         if ticks_diff(now, stats_at) >= 5000:
             secs = ticks_diff(now, stats_at) / 1000
             print(
-                "loop %d Hz, worst %d ms | refresh %.1f fps, worst %d ms | panel %s | free %d%s"
+                "loop %d Hz, worst %d ms | refresh %.1f fps, worst %d ms | panel %s | scene %s %s ms | free %d%s"
                 % (loops / secs, worst, ui.refreshes / secs, ui.refresh_ms_max,
-                   panel_stats(),
+                   panel_stats(), scene_kind, scene_worst[:len(scenes)],
                    gc.mem_free(), " | KEY EVENTS OVERFLOWED" if hw.keys.events.overflowed else "")
             )
+            for s in scenes:
+                prof = getattr(s, "prof", None)
+                if prof:
+                    print("  hud render worst: clock %d, weather %d, status %d, icon %d ms" % tuple(prof))
+                    for i in range(len(prof)):
+                        prof[i] = 0
             for p in panels:
                 p.flush_ms_max = 0
             # overflowed is read-only and sticky (only events.clear() resets it,
             # which would drop queued presses), so it's reported, not reset.
             loops = worst = ui.refreshes = ui.refresh_ms_max = 0
+            for i in range(len(scene_worst)):
+                scene_worst[i] = 0
             stats_at = now

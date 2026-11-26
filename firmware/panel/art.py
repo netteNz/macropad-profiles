@@ -71,7 +71,7 @@ class Scene:
         cx, cy = key_center(k)
         self.ripples.append([cx, cy, now])
 
-    def knob(self, delta):
+    def knob(self, delta, now=None):
         if delta:
             self._dir = 1 if delta > 0 else -1
             self._amp16 = min(WAVE_MAX * 16, self._amp16 + WAVE_PER_DETENT * 16 * abs(delta))

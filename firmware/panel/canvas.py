@@ -65,31 +65,47 @@ class Canvas:
         self.vline(x, y, h, on)
         self.vline(x + w - 1, y, h, on)
 
-    def text(self, x, y, s):
-        """ASCII text, 6 px per char (5 + 1 gap), 8 rows tall. Returns end x.
+    def text(self, x, y, s, font=font5x7):
+        """ASCII text at any y. Returns end x. Default font: 5x7 with a 1 px
+        gap (6 px per char); panel/fonts.py has the HUD fonts.
         Characters outside 0x20..0x7E draw as '?'."""
-        g = font5x7.GLYPHS
+        # Hot path (the HUD draws a lot of text): bounds, page offsets and
+        # dirty bits are worked out once per string, not per glyph column.
+        g = font.GLYPHS
+        fw = font.W
+        first, last = font.FIRST, font.LAST
+        adv = getattr(font, "ADV", fw + 1)
         b = self.buf
         shift = y & 7
         p = y >> 3
+        top = p * W if 0 <= p < PAGES else -1
+        bot = (p + 1) * W if shift and 0 <= p + 1 < PAGES else -1
+        if top >= 0:
+            self.dirty |= 1 << p
+        if bot >= 0:
+            self.dirty |= 1 << (p + 1)
+        rshift = 8 - shift
         for ch in s:
             c = ord(ch)
-            if c < font5x7.FIRST or c > font5x7.LAST:
+            if c < first or c > last:
                 c = 0x3F
-            o = (c - font5x7.FIRST) * font5x7.W
-            for col in range(font5x7.W):
-                cx = x + col
-                if 0 <= cx < W:
-                    bits = g[o + col]
-                    if 0 <= p < PAGES:
-                        b[p * W + cx] |= (bits << shift) & 0xFF
-                        self.dirty |= 1 << p
-                    if shift and 0 <= p + 1 < PAGES:
-                        b[(p + 1) * W + cx] |= bits >> (8 - shift)
-                        self.dirty |= 1 << (p + 1)
-            x += font5x7.W + 1
+            o = (c - first) * fw
+            c0 = -x if x < 0 else 0
+            c1 = W - x if x + fw > W else fw
+            for col in range(c0, c1):
+                bits = g[o + col]
+                if bits:
+                    if top >= 0:
+                        b[top + x + col] |= (bits << shift) & 0xFF
+                    if bot >= 0:
+                        b[bot + x + col] |= bits >> rshift
+            x += adv
         return x
 
 
-def text_width(s):
-    return len(s) * (font5x7.W + 1) - 1 if s else 0
+def text_width(s, font=font5x7):
+    """Inked width: the trailing gap isn't counted for the 5x7 font."""
+    if not s:
+        return 0
+    adv = getattr(font, "ADV", None)
+    return len(s) * adv if adv else len(s) * (font.W + 1) - 1
