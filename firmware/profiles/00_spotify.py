@@ -11,6 +11,7 @@ app = {
     "apps": ["spotify.exe"],
     "knob": "spotify_volume",
     "leds": "rainbow",
+    "panel": "spotify",  # record + now playing on the extra OLEDs
     "macros": [
         # 1st row ----------
         (0x00FF40, "Prev", [[CC.SCAN_PREVIOUS_TRACK]]),
