@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560" role="img" aria-labelledby="t d">
+  <title id="t">PCA9548A mux with two OLEDs</title>
+  <desc id="d">An Adafruit PCA9548A I2C mux at 0x70. Its IN port takes the cable from the MacroPad. Channel 0 and channel 1 each run a STEMMA QT to female-jumper cable to an Elegoo SSD1306 OLED on a breadboard: black to GND, red to VCC, yellow to SCL, blue to SDA. Both panels sit at 0x3C on their own channel.</desc>
+  <style>
+    .sans { font-family: "Segoe UI", -apple-system, Helvetica, Arial, sans-serif; }
+    .mono { font-family: Consolas, Menlo, "DejaVu Sans Mono", monospace; }
+    .h { font-size: 15px; font-weight: 600; fill: #1f2328; }
+    .p { font-size: 13px; fill: #424a53; }
+    .note { font-size: 12px; fill: #6e7781; }
+    .tiny { font-size: 10px; fill: #f0f3f6; }
+    .pin { font-size: 7px; fill: #f0f3f6; text-anchor: middle; }
+    .silk { font-size: 7px; fill: #c9d1d9; text-anchor: middle; }
+    .title { font-size: 11px; fill: #f2cc60; }
+    .port { fill: #f0f3f6; stroke: #d0d7de; }
+    .used { fill: #f0f3f6; stroke: #1a7f37; stroke-width: 2; }
+    .wire { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+    .ring { stroke: #58a6ff; stroke-width: 1.5; fill: none; }
+    .star { fill: #58a6ff; }
+  </style>
+  <defs>
+    <pattern id="holes" width="9" height="9" patternUnits="userSpaceOnUse">
+      <rect x="3" y="3" width="3" height="3" fill="#d0d7de"/>
+    </pattern>
+  </defs>
+
+  <!-- card background, readable in light and dark GitHub themes -->
+  <rect x="0.5" y="0.5" width="759" height="559" rx="16" fill="#f6f8fa" stroke="#d0d7de"/>
+
+  <g class="sans">
+    <text class="h" x="40" y="38">PCA9548A I²C mux</text>
+    <text class="note" x="40" y="56">0x70 · ch 0 and 1 in use</text>
+  </g>
+
+  <!-- breadboard -->
+  <rect x="320" y="180" width="410" height="262" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+  <line x1="334" y1="192" x2="716" y2="192" stroke="#cf222e" stroke-width="1"/>
+  <rect x="334" y="196" width="382" height="9" fill="url(#holes)"/>
+  <line x1="334" y1="209" x2="716" y2="209" stroke="#0969da" stroke-width="1"/>
+  <rect x="334" y="218" width="382" height="186" fill="url(#holes)"/>
+  <line x1="334" y1="413" x2="716" y2="413" stroke="#cf222e" stroke-width="1"/>
+  <rect x="334" y="417" width="382" height="9" fill="url(#holes)"/>
+  <line x1="334" y1="430" x2="716" y2="430" stroke="#0969da" stroke-width="1"/>
+
+  <!-- OLED, ch 0 -->
+  <rect x="360" y="230" width="160" height="140" rx="5" fill="#0b3d91"/>
+  <circle cx="370" cy="240" r="5" fill="#f6f8fa" stroke="#c9d1d9" stroke-width="2"/>
+  <circle cx="510" cy="240" r="5" fill="#f6f8fa" stroke="#c9d1d9" stroke-width="2"/>
+  <circle cx="370" cy="360" r="5" fill="#f6f8fa" stroke="#c9d1d9" stroke-width="2"/>
+  <circle cx="510" cy="360" r="5" fill="#f6f8fa" stroke="#c9d1d9" stroke-width="2"/>
+  <circle cx="410" cy="241" r="3" fill="#d4a72c"/>
+  <text class="sans pin" x="410" y="254">GND</text>
+  <circle cx="428" cy="241" r="3" fill="#d4a72c"/>
+  <text class="sans pin" x="428" y="254">VCC</text>
+  <circle cx="446" cy="241" r="3" fill="#d4a72c"/>
+  <text class="sans pin" x="446" y="254">SCL</text>
+  <circle cx="464" cy="241" r="3" fill="#d4a72c"/>
+  <text class="sans pin" x="464" y="254">SDA</text>
+  <rect x="372" y="262" width="136" height="68" rx="2" fill="#000000"/>
+  <text class="mono title" x="378" y="275">Browser</text>
+  <line x1="372" y1="279" x2="508" y2="279" stroke="#30363d" stroke-width="0.6"/>
+  <circle class="ring" cx="402" cy="305" r="15"/>
+  <circle class="ring" cx="402" cy="305" r="7" opacity="0.6"/>
+  <g class="star"><rect x="444" y="290" width="2" height="2"/><rect x="480" y="316" width="2" height="2"/><rect x="496" y="292" width="2" height="2"/><rect x="436" y="322" width="2" height="2"/><rect x="464" y="300" width="2" height="2"/></g>
+  <text class="mono tiny" x="372" y="353">ch 0 · SSD1306 @ 0x3C</text>
+  <rect x="404" y="213" width="12" height="30" rx="1.5" fill="#1f2328"/>
+  <rect x="422" y="213" width="12" height="30" rx="1.5" fill="#1f2328"/>
+  <rect x="440" y="213" width="12" height="30" rx="1.5" fill="#1f2328"/>
+  <rect x="458" y="213" width="12" height="30" rx="1.5" fill="#1f2328"/>
+  <!-- OLED, ch 1 -->
+  <rect x="530" y="230" width="160" height="140" rx="5" fill="#0b3d91"/>
+  <circle cx="540" cy="240" r="5" fill="#f6f8fa" stroke="#c9d1d9" stroke-width="2"/>
+  <circle cx="680" cy="240" r="5" fill="#f6f8fa" stroke="#c9d1d9" stroke-width="2"/>
+  <circle cx="540" cy="360" r="5" fill="#f6f8fa" stroke="#c9d1d9" stroke-width="2"/>
+  <circle cx="680" cy="360" r="5" fill="#f6f8fa" stroke="#c9d1d9" stroke-width="2"/>
+  <circle cx="580" cy="241" r="3" fill="#d4a72c"/>
+  <text class="sans pin" x="580" y="254">GND</text>
+  <circle cx="598" cy="241" r="3" fill="#d4a72c"/>
+  <text class="sans pin" x="598" y="254">VCC</text>
+  <circle cx="616" cy="241" r="3" fill="#d4a72c"/>
+  <text class="sans pin" x="616" y="254">SCL</text>
+  <circle cx="634" cy="241" r="3" fill="#d4a72c"/>
+  <text class="sans pin" x="634" y="254">SDA</text>
+  <rect x="542" y="262" width="136" height="68" rx="2" fill="#000000"/>
+  <text class="mono title" x="548" y="275">Browser</text>
+  <line x1="542" y1="279" x2="678" y2="279" stroke="#30363d" stroke-width="0.6"/>
+  <path stroke="#58a6ff" stroke-width="1.5" fill="none" d="M548 305 Q560 290 572 305 T596 305 T620 305 T644 305 T668 305"/>
+  <g class="star"><rect x="556" y="322" width="2" height="2"/><rect x="658" y="288" width="2" height="2"/><rect x="604" y="324" width="2" height="2"/><rect x="642" y="320" width="2" height="2"/></g>
+  <text class="mono tiny" x="542" y="353">ch 1 · SSD1306 @ 0x3C</text>
+  <rect x="574" y="213" width="12" height="30" rx="1.5" fill="#1f2328"/>
+  <rect x="592" y="213" width="12" height="30" rx="1.5" fill="#1f2328"/>
+  <rect x="610" y="213" width="12" height="30" rx="1.5" fill="#1f2328"/>
+  <rect x="628" y="213" width="12" height="30" rx="1.5" fill="#1f2328"/>
+
+  <!-- PCA9548A mux, laid out like the board: IN at the bottom, 0-3 up the right, 4-7 down the left -->
+  <rect x="70" y="70" width="130" height="300" rx="12" fill="#1f2328"/>
+  <circle cx="95" cy="84" r="4" fill="#1f2328" stroke="#d4a72c" stroke-width="1.5"/>
+  <text class="sans silk" x="95" y="100">V+</text>
+  <circle cx="115" cy="84" r="4" fill="#1f2328" stroke="#d4a72c" stroke-width="1.5"/>
+  <text class="sans silk" x="115" y="100">−</text>
+  <circle cx="135" cy="84" r="4" fill="#1f2328" stroke="#d4a72c" stroke-width="1.5"/>
+  <text class="sans silk" x="135" y="100">SCL</text>
+  <circle cx="155" cy="84" r="4" fill="#1f2328" stroke="#d4a72c" stroke-width="1.5"/>
+  <text class="sans silk" x="155" y="100">SDA</text>
+  <circle cx="175" cy="84" r="4" fill="#1f2328" stroke="#d4a72c" stroke-width="1.5"/>
+  <text class="sans silk" x="175" y="100">RST</text>
+  <rect x="115" y="110" width="40" height="12" rx="2" fill="#d4a72c"/>
+  <rect x="117" y="112" width="16" height="8" rx="1" fill="#f6f8fa"/>
+  <text class="mono silk" x="104" y="119">3V</text>
+  <text class="mono silk" x="166" y="119">V+</text>
+  <rect x="105" y="170" width="60" height="64" rx="3" fill="#0d1117" stroke="#30363d"/>
+  <line x1="99" y1="178" x2="105" y2="178" stroke="#8c959f"/><line x1="165" y1="178" x2="171" y2="178" stroke="#8c959f"/>
+  <line x1="99" y1="188" x2="105" y2="188" stroke="#8c959f"/><line x1="165" y1="188" x2="171" y2="188" stroke="#8c959f"/>
+  <line x1="99" y1="198" x2="105" y2="198" stroke="#8c959f"/><line x1="165" y1="198" x2="171" y2="198" stroke="#8c959f"/>
+  <line x1="99" y1="208" x2="105" y2="208" stroke="#8c959f"/><line x1="165" y1="208" x2="171" y2="208" stroke="#8c959f"/>
+  <line x1="99" y1="218" x2="105" y2="218" stroke="#8c959f"/><line x1="165" y1="218" x2="171" y2="218" stroke="#8c959f"/>
+  <line x1="99" y1="228" x2="105" y2="228" stroke="#8c959f"/><line x1="165" y1="228" x2="171" y2="228" stroke="#8c959f"/>
+  <circle cx="86" cy="354" r="7" fill="#f6f8fa" stroke="#d4a72c" stroke-width="2"/>
+  <circle cx="184" cy="354" r="7" fill="#f6f8fa" stroke="#d4a72c" stroke-width="2"/>
+  <rect class="port" x="186" y="118" width="28" height="38" rx="2"/>
+  <text class="mono tiny" x="180" y="141" text-anchor="end">3</text>
+  <rect class="port" x="186" y="166" width="28" height="38" rx="2"/>
+  <text class="mono tiny" x="180" y="189" text-anchor="end">2</text>
+  <rect class="used" x="186" y="214" width="28" height="38" rx="2"/>
+  <text class="mono tiny" x="180" y="237" text-anchor="end">1</text>
+  <rect class="used" x="186" y="262" width="28" height="38" rx="2"/>
+  <text class="mono tiny" x="180" y="285" text-anchor="end">0</text>
+  <rect class="port" x="56" y="118" width="28" height="38" rx="2"/>
+  <text class="mono tiny" x="90" y="141">4</text>
+  <rect class="port" x="56" y="166" width="28" height="38" rx="2"/>
+  <text class="mono tiny" x="90" y="189">5</text>
+  <rect class="port" x="56" y="214" width="28" height="38" rx="2"/>
+  <text class="mono tiny" x="90" y="237">6</text>
+  <rect class="port" x="56" y="262" width="28" height="38" rx="2"/>
+  <text class="mono tiny" x="90" y="285">7</text>
+  <rect class="port" x="113" y="362" width="44" height="26" rx="2"/>
+  <text class="mono tiny" x="135" y="356" text-anchor="middle">IN</text>
+  <!-- IN: cable to the MacroPad -->
+  <path class="wire" stroke="#24292f" d="M130.5 388 C130.5 440 130.5 470 105.5 495 L95.5 505"/>
+  <path class="wire" stroke="#cf222e" d="M133.5 388 C133.5 440 133.5 470 108.5 495 L98.5 505"/>
+  <path class="wire" stroke="#0969da" d="M136.5 388 C136.5 440 136.5 470 111.5 495 L101.5 505"/>
+  <path class="wire" stroke="#d4a72c" d="M139.5 388 C139.5 440 139.5 470 114.5 495 L104.5 505"/>
+  <text class="sans note" x="60" y="528">to MacroPad STEMMA QT</text>
+  <!-- ch 0 -> left OLED -->
+  <path class="wire" stroke="#24292f" d="M214 276.5 C300 276.5 410 130 410 213"/>
+  <path class="wire" stroke="#cf222e" d="M214 279.5 C300 279.5 428 130 428 213"/>
+  <path class="wire" stroke="#0969da" d="M214 282.5 C300 282.5 464 130 464 213"/>
+  <path class="wire" stroke="#d4a72c" d="M214 285.5 C300 285.5 446 130 446 213"/>
+  <!-- ch 1 -> right OLED, arcing over the left one -->
+  <path class="wire" stroke="#24292f" d="M214 228.5 C290 228.5 300 75.5 420 75.5 S580 120 580 213"/>
+  <path class="wire" stroke="#cf222e" d="M214 231.5 C290 231.5 300 78.5 420 78.5 S598 120 598 213"/>
+  <path class="wire" stroke="#0969da" d="M214 234.5 C290 234.5 300 81.5 420 81.5 S634 120 634 213"/>
+  <path class="wire" stroke="#d4a72c" d="M214 237.5 C290 237.5 300 84.5 420 84.5 S616 120 616 213"/>
+
+  <g class="sans">
+    <rect x="330" y="472" width="12" height="12" rx="2" fill="#24292f"/><text class="p" x="348" y="483">GND</text>
+    <rect x="400" y="472" width="12" height="12" rx="2" fill="#cf222e"/><text class="p" x="418" y="483">VCC 3.3 V</text>
+    <rect x="510" y="472" width="12" height="12" rx="2" fill="#0969da"/><text class="p" x="528" y="483">SDA</text>
+    <rect x="580" y="472" width="12" height="12" rx="2" fill="#d4a72c"/><text class="p" x="598" y="483">SCL</text>
+    <text class="p" x="330" y="510">Both panels answer at 0x3C, each on its own channel.</text>
+    <text class="note" x="330" y="530">Switch on 3V. Any free port works; firmware scans all 8.</text>
+  </g>
+</svg>

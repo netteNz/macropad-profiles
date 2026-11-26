@@ -38,6 +38,10 @@ software is needed.
 - **LEDs:** static per-key colors or a rainbow cycle. Held keys light up white.
 - The last-used profile is restored after a reset.
 
+<p align="center">
+  <img src="docs/oled-mux-bench.svg" width="760" alt="Wiring for two extra OLEDs: a PCA9548A I2C mux at 0x70 takes the MacroPad's STEMMA QT cable on its IN port, and channels 0 and 1 each run to an SSD1306 OLED at 0x3C (black to GND, red to VCC, yellow to SCL, blue to SDA)">
+</p>
+
 ## Requirements
 
 - An Adafruit MacroPad RP2040 running CircuitPython 10
