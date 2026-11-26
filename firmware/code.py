@@ -13,8 +13,6 @@ from actions import KNOB, PRESS, Runner
 from gestures import Encoder
 from leds import Leds
 from panel.art import Scene
-from panel.hostdata import HostData
-from panel.hud import HudScene
 from panel.spotify import RecordScene
 from panel.transport import Transport
 from ui.keymap import KeymapView
@@ -22,7 +20,12 @@ from ui.manager import UI
 from ui.picker import Picker
 from ui.volume import VolumeOverlay
 
-DEMO = True  # fake clock + weather on the HUD until the PC helper exists (step 5)
+# Spotify's second panel: the clock/weather/status HUD needs real time and
+# weather (parked, see docs/next-hud-data.md), so it shows the particles for
+# now. HUD = True brings it back; DEMO feeds it fake data. With HUD off the
+# HUD modules aren't even imported (saves RAM).
+HUD = False
+DEMO = False
 DEBUG = True  # loop/refresh stats on the serial console every 5 s; off once Phase 1 is signed off
 
 ui = UI(hw.display)
@@ -35,8 +38,13 @@ runner = Runner(hw.keyboard, hw.consumer, hw.layout)
 encoder = Encoder()
 panels = hw.panels  # extra OLEDs on STEMMA QT (direct or behind a mux), may be empty
 transport = Transport()  # play state guessed from what the pad sends
-host_data = HostData()  # time/weather/moon from the PC helper (none yet)
-if DEMO:
+HudScene = None
+if HUD:
+    from panel.hostdata import HostData
+    from panel.hud import HudScene
+
+    host_data = HostData()  # time/weather/moon from the PC helper (none yet)
+if HUD and DEMO:
     from panel.demo import Demo
 
     demo = Demo(host_data, ticks_ms())
@@ -74,7 +82,7 @@ def build_scenes(kind):
     for i, p in enumerate(panels):
         if kind == "spotify" and i == 0:
             out.append(RecordScene(p.canvas, transport))
-        elif kind == "spotify" and i == 1:
+        elif kind == "spotify" and i == 1 and HUD:
             out.append(HudScene(p.canvas, transport, host_data))
         else:
             out.append(Scene(p.canvas))
@@ -100,7 +108,11 @@ def set_profile(i):
 def panel_volume():
     """True when volume shows on an extra panel, so the main OLED skips its
     overlay (its refresh stalls the loop 25-45 ms, the fast-turn stutter)."""
-    return scene_kind == "spotify" and any(p.alive for p in panels)
+    if scene_kind != "spotify" or not panels:
+        return False
+    if HUD:  # the record and the HUD's status view both show volume
+        return any(p.alive for p in panels)
+    return panels[0].alive  # only the record does
 
 
 def on_turn(delta, now):
@@ -128,7 +140,7 @@ def on_gesture(g, now):
     elif name == "press":
         transport.on_action(current["press"], now)
         for s in scenes:
-            if isinstance(s, HudScene):
+            if HUD and isinstance(s, HudScene):
                 s.key(-1, now)  # a knob press is an action too: show status
         runner.start(PRESS, current["press"], tap=True, now=now)
     elif name == "long_press":
@@ -137,7 +149,7 @@ def on_gesture(g, now):
             # so a long press corrects its guess without sending anything.
             transport.play_toggle(now)
             for s in scenes:
-                if isinstance(s, HudScene):
+                if HUD and isinstance(s, HudScene):
                     s.key(-1, now)  # pop the status view to show the new state
         elif not ui.toggle_base() and DEBUG:
             print("long-press: only one base view")
@@ -204,7 +216,7 @@ while True:
             runner.release(k)
 
     poll_encoder(now)
-    if DEMO:
+    if HUD and DEMO:
         demo.tick(now)
 
     runner.tick(now)
