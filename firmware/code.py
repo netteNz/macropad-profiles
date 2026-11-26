@@ -127,6 +127,9 @@ def on_gesture(g, now):
         on_turn(g[1], now)
     elif name == "press":
         transport.on_action(current["press"], now)
+        for s in scenes:
+            if isinstance(s, HudScene):
+                s.key(-1, now)  # a knob press is an action too: show status
         runner.start(PRESS, current["press"], tap=True, now=now)
     elif name == "long_press":
         if current["panel"] == "spotify":

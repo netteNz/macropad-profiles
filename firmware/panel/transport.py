@@ -43,6 +43,7 @@ class Transport:
         self.playing = True
         self.track_n += 1
         self.liked = False
+        self.duration_ms = None  # unknown until the host sends the new one
 
     def seek(self, ms, now):
         e = self.elapsed(now) + ms

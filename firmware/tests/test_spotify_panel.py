@@ -44,6 +44,13 @@ class TransportTest(unittest.TestCase):
         t.seek(60000, 2000)
         self.assertEqual(t.elapsed(5000), 10000)
 
+    def test_new_track_forgets_old_length(self):
+        t = self.t
+        t.duration_ms = 4000
+        t.track(0)
+        self.assertIsNone(t.duration_ms)
+        self.assertIsNone(t.progress(1000, 100))
+
     def test_progress_needs_duration(self):
         t = self.t
         t.play_toggle(0)
